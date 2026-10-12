@@ -2,21 +2,14 @@
 import { Button, Layout, Menu, MenuProps, Typography } from "antd";
 import { useState } from "react";
 import {
-  AppstoreOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  SettingOutlined,
-  TeamOutlined,
-  CalendarOutlined,
-  DollarOutlined,
-  CreditCardOutlined,
 } from "@ant-design/icons";
 import {
   getSidebarNavState,
-  SidebarNavIcon,
   SidebarNavItemConfig,
-} from "./util";
-import { CurrentUser, HeaderUserSection } from "./header-user-section";
+} from "./SideNav";
+import { CurrentUser, HeaderUserSection } from "./HeaderUserSection";
 import Link from "next/link";
 
 const { Header, Sider, Content } = Layout;
@@ -38,36 +31,16 @@ type SidebarNavProps = {
 
 type SidebarMenuItem = NonNullable<MenuProps["items"]>[number];
 
-function getMenuIcon(icon: SidebarNavIcon) {
-  switch (icon) {
-    case "home":
-      return <AppstoreOutlined />;
-    case "users":
-      return <TeamOutlined />;
-    case "calendar":
-      return <CalendarOutlined />;
-    case "payments":
-      return <CreditCardOutlined />;
-    case "settings":
-      return <SettingOutlined />;
-    case "rates":
-      return <DollarOutlined />;
-    default:
-      return null;
-  }
-}
-
 function buildMenuItems(
   items: SidebarNavItemConfig[],
   can: SidebarNavProps["can"],
 ): SidebarMenuItem[] {
   return items.map((item) => {
-    const icon = item.icon ? getMenuIcon(item.icon) : undefined;
 
     if (item.children?.length) {
       return {
         key: item.key,
-        icon,
+        icon: item.icon,
         label: item.label,
         children: buildMenuItems(item.children, can),
       };
@@ -75,7 +48,7 @@ function buildMenuItems(
 
     return {
       key: item.key,
-      icon,
+      icon: item.icon,
       label: item.href ? (
         <Link href={item.href}>{item.label}</Link>
       ) : (
@@ -100,7 +73,6 @@ const AppShellLayout = ({
     visibleItems,
   );
   const [openKeys, setOpenKeys] = useState<string[]>(matchedOpenKeys);
-
 
   return (
     <Layout style={{ minHeight: "100vh" }}>

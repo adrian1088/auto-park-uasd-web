@@ -1,6 +1,6 @@
 import { http } from '@/app/lib/http';
 import { httpConfig } from '@/app/lib/http/config';
-import type { CurrentUser } from '@/app/components/layout/header-user-section';
+import type { CurrentUser } from '@/app/components/layout/HeaderUserSection';
 
 type LoginResponse = { accessToken?: string };
 

@@ -1,16 +1,17 @@
-export type SidebarNavIcon =
-  | "home"
-  | "users"
-  | "calendar"
-  | "payments"
-  | "settings"
-  | "rates"
+import {
+  AppstoreOutlined,
+  DollarOutlined,
+  UserOutlined,
+  CalendarOutlined,
+  CreditCardOutlined,
+  SettingOutlined,
+} from "@ant-design/icons";
 
 export type SidebarNavItemConfig = {
   key: string;
   label: string;
   href?: string;
-  icon?: SidebarNavIcon;
+  icon?: React.ReactNode;
   matchPrefixes?: string[];
   requiredPermission?: string;
   children?: SidebarNavItemConfig[];
@@ -100,42 +101,49 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
     key: "dashboard",
     href: "/",
     label: "Dashboard",
-    icon: "home",
+    icon: <AppstoreOutlined />,
     matchPrefixes: ["/"],
   },
   {
     key: "rates",
     label: "Tarifas",
     href: "/rates",
-    icon: "rates",
+    icon: <DollarOutlined />,
     matchPrefixes: ["/rates"],
   },
   {
     key: "users",
     label: "Usuarios",
     href: "/users",
-    icon: "users",
+    icon: <UserOutlined />,
     matchPrefixes: ["/users"],
   },
   {
     key: "reservations",
     label: "Reservaciones",
     href: "/reservations",
-    icon: "calendar",
+    icon: <CalendarOutlined />,
     matchPrefixes: ["/reservations"],
   },
   {
     key: "payments",
     label: "Pagos",
     href: "/payments",
-    icon: "payments",
+    icon: <CreditCardOutlined />,
     matchPrefixes: ["/payments"],
   },
   {
     key: "settings",
-    href: "/settings",
+    icon: <SettingOutlined />,
     label: "Configuraciones",
-    icon: "settings",
     matchPrefixes: ["/settings"],
+    children: [
+      {
+        key: "profile",
+        href: "/settings/lots",
+        label: "Localidades",
+        matchPrefixes: ["/settings/lots"],
+      },
+    ],
   },
 ];

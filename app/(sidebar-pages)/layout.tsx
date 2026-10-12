@@ -3,10 +3,10 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { http } from "../lib/http";
-import AppShellLayout from "../components/layout/app-shell-layout";
+import AppShellLayout from "../components/layout/AppShellLayout";
 import { getCurrentUser, logout } from "../lib/api/auth";
-import type { CurrentUser } from "../components/layout/header-user-section";
-import { SIDEBAR_NAV_ITEMS } from "../components/layout/util";
+import type { CurrentUser } from "../components/layout/HeaderUserSection";
+import { SIDEBAR_NAV_ITEMS } from "../components/layout/SideNav";
 
 const LayoutShell = ({ children }: { children: React.ReactNode }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
