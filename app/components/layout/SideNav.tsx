@@ -144,6 +144,12 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
         label: "Localidades",
         matchPrefixes: ["/settings/lots"],
       },
+      {
+        key: "floors",
+        href: "/settings/floors",
+        label: "Pisos de estacionamiento",
+        matchPrefixes: ["/settings/floors"],
+      },
     ],
   },
 ];

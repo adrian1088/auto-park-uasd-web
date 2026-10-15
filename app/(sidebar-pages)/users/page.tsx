@@ -8,6 +8,7 @@ import type { User, UserFields } from "@/app/lib/api/users";
 import { requiredText } from "@/app/lib/utils";
 import DataTableUser from "./components/DataTableUser";
 import FormUser from "./components/FormUser";
+import { FilterOutlined, PlusOutlined } from "@ant-design/icons";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error
@@ -123,9 +124,15 @@ const UsersPage = () => {
           },
         }}
         extra={
-          <Button type="primary" onClick={openCreateModal}>
-            Crear Usuario
-          </Button>
+          <Flex gap={8}>
+            <Button type="default" onClick={openCreateModal}>
+              <FilterOutlined />
+            </Button>
+            <Button type="primary" onClick={openCreateModal}>
+              <PlusOutlined />
+              Invitar Usuario
+            </Button>
+          </Flex>
         }
       >
         <DataTableUser reloadKey={reloadKey} onEdit={openEditModal} />
