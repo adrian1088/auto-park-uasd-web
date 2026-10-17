@@ -5,6 +5,7 @@ import {
   ApiResponse,
 } from "./base";
 
+export const lotsPath = "/parking/lots";
 export type ParkingLot = {
   id: number;
   name: string;
@@ -25,7 +26,6 @@ export type ParkingLotPaginatedParams = {
 export type CreateParkingLotInput = ParkingLotFields;
 export type UpdateParkingLotInput = Partial<ParkingLotFields>;
 
-const lotsPath = "/parking/lots";
 
 export async function getParkingLots() {
   const response = await http.get<ApiResponseList<ParkingLot>>(lotsPath);

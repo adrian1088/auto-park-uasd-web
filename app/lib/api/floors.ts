@@ -1,30 +1,37 @@
 import { http } from "@/app/lib/http";
-import type { ApiResponse, ApiResponseList } from "./base";
+import type { ApiResponse, ApiResponseList, ApiResponseWithPagination } from "./base";
 import type { ParkingLot } from "./lots";
 
+export const floorsPath = "/parking/floors";
 export type ParkingFloorStatus = "OPEN" | "FULL";
 
 export type ParkingFloor = {
   id: number;
   floorNumber: number;
   status: ParkingFloorStatus;
-  parkingLot: Pick<ParkingLot, "id" | "name">;
+  totalSpaceCount: number;
+  lot: Pick<ParkingLot, "id" | "name" | "capacity">;
   spaces: Array<{ id: number }>;
 };
 
 export type ParkingFloorFields = {
-  parkingLotId: number;
+  lotId: number;
   floorNumber: number;
 };
 
 export type CreateParkingFloorInput = ParkingFloorFields;
 export type UpdateParkingFloorInput = Partial<ParkingFloorFields>;
+export type ParkingFloorPaginatedParams = {
+  lotId?: number;
+  floorNumber?: number;
+  page?: number;
+  limit?: number;
+};
 
-const floorsPath = "/parking/floors";
-
-export async function getParkingFloors(parkingLotId?: number) {
+// El API exige lotId para listar pisos sin paginar.
+export async function getParkingFloors(lotId: number) {
   const response = await http.get<ApiResponseList<ParkingFloor>>(floorsPath, {
-    query: { parkingLotId },
+    query: { lotId },
   });
   return response.data;
 }
@@ -34,6 +41,15 @@ export async function getParkingFloor(id: number) {
     `${floorsPath}/${id}`,
   );
   return response.data;
+}
+
+export function getParkingFloorsPaginated(
+  query: ParkingFloorPaginatedParams = {},
+) {
+  return http.get<ApiResponseWithPagination<ParkingFloor>>(
+    `${floorsPath}/paginated`,
+    { query },
+  );
 }
 
 export async function createParkingFloor(input: CreateParkingFloorInput) {

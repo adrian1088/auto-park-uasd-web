@@ -24,6 +24,7 @@ function getErrorMessage(error: unknown) {
 
 function getRateFields(values: Record<string, unknown>): RateFields {
   const { parkingLotId: rawParkingLotId, type, amount, validFrom, validTo } = values;
+  console.log("🚀 ~ getRateFields ~ values:", values)
   const parkingLotId = Number(rawParkingLotId);
   if (isNaN(parkingLotId)) {
     throw new Error("El estacionamiento es obligatorio.");

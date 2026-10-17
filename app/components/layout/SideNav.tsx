@@ -141,7 +141,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
       {
         key: "profile",
         href: "/settings/lots",
-        label: "Localidades",
+        label: "Localidades de estacionamiento",
         matchPrefixes: ["/settings/lots"],
       },
       {
@@ -149,6 +149,12 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
         href: "/settings/floors",
         label: "Pisos de estacionamiento",
         matchPrefixes: ["/settings/floors"],
+      },
+      {
+        key: "spaces",
+        href: "/settings/spaces",
+        label: "Espacios de estacionamiento",
+        matchPrefixes: ["/settings/spaces"],
       },
     ],
   },

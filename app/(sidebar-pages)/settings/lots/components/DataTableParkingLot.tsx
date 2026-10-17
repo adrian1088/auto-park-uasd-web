@@ -164,6 +164,7 @@ const DataTableParkingLot = ({ reloadKey = 0, onEdit }: Props) => {
           pageSize,
           total,
           showSizeChanger: true,
+          style: { paddingRight: "24px" },
         }}
         onChange={(pagination) => {
           setPage(pagination.current ?? 1);

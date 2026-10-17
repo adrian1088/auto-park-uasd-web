@@ -45,7 +45,6 @@ const SignInPage = () => {
       const next = new URLSearchParams(window.location.search).get('next');
       router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/');
     } catch (error) {
-      console.log("🚀 ~ onFinish ~ error:", error)
       setErrorMessage(
         error instanceof HttpError && error.status === 401
           ? 'Credenciales inválidas. Verifica tu usuario/correo y contraseña.'
@@ -61,23 +60,26 @@ const SignInPage = () => {
       align="center"
       justify="center"
       style={{
-        width: '100%',
+        width: "100%",
         maxWidth: 380,
-        margin: '0 auto',
-        padding: '0 24px',
+        margin: "0 auto",
+        padding: "0 24px",
       }}
       vertical
     >
+
+      <Title level={1}>Auto Park UASD</Title>
       <Title level={2}>Iniciar sesión</Title>
-      <Paragraph style={{ textAlign: 'center' }} type="secondary">
-        Usa tu nombre de usuario o dirección de correo electrónico para ingresar a la plataforma.
+      <Paragraph style={{ textAlign: "center" }} type="secondary">
+        Usa tu nombre de usuario o dirección de correo electrónico para ingresar
+        a la plataforma.
       </Paragraph>
       {errorMessage ? (
         <Alert
           title={errorMessage}
           type="error"
           showIcon
-          style={{ width: '100%', marginBottom: 16 }}
+          style={{ width: "100%", marginBottom: 16 }}
         />
       ) : null}
       <Form
@@ -85,13 +87,17 @@ const SignInPage = () => {
         disabled={submitting || isLoading}
         initialValues={{ remember: true }}
         onFinish={onFinish}
-        style={{ width: '100%' }}
+        style={{ width: "100%" }}
         layout="vertical"
       >
         <Form.Item
           name="identifier"
           rules={[
-            { required: true, message: 'Por favor ingresa tu nombre de usuario o correo electrónico!' },
+            {
+              required: true,
+              message:
+                "Por favor ingresa tu nombre de usuario o correo electrónico!",
+            },
           ]}
         >
           <Input
@@ -103,7 +109,9 @@ const SignInPage = () => {
         </Form.Item>
         <Form.Item
           name="password"
-          rules={[{ required: true, message: 'Por favor ingresa tu contraseña!' }]}
+          rules={[
+            { required: true, message: "Por favor ingresa tu contraseña!" },
+          ]}
         >
           <Input
             size="large"
