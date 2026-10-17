@@ -2,9 +2,10 @@
 
 import {
   deleteParkingFloor,
-  getParkingFloors,
+  getParkingFloorsPaginated,
 } from "@/app/lib/api/floors";
 import type { ParkingFloor } from "@/app/lib/api/floors";
+import { DEFAULT_PAGE_SIZE } from "@/app/lib/constants";
 import { Alert, Button, Popconfirm, Space, Table, Tag, message } from "antd";
 import type { TableProps } from "antd";
 import { useEffect, useState } from "react";
@@ -16,23 +17,29 @@ function getErrorMessage(error: unknown) {
 }
 
 type Props = {
-  parkingLotId?: number;
+  lotId?: number;
   reloadKey?: number;
   onEdit: (id: number) => Promise<void>;
 };
 
-const DataTableParkingFloor = ({
-  parkingLotId,
-  reloadKey = 0,
-  onEdit,
-}: Props) => {
+const DataTableParkingFloor = ({ lotId, reloadKey = 0, onEdit }: Props) => {
   const [floors, setFloors] = useState<ParkingFloor[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [localReload, setLocalReload] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
+
+  // Al cambiar el filtro se vuelve a la primera página.
+  const [prevLotId, setPrevLotId] = useState(lotId);
+  if (prevLotId !== lotId) {
+    setPrevLotId(lotId);
+    setPage(1);
+  }
 
   useEffect(() => {
     let active = true;
@@ -41,8 +48,14 @@ const DataTableParkingFloor = ({
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await getParkingFloors(parkingLotId);
-        if (active) setFloors(data);
+        const response = await getParkingFloorsPaginated({
+          page,
+          limit: pageSize,
+          lotId,
+        });
+        if (!active) return;
+        setFloors(response.data);
+        setTotal(response.meta.total);
       } catch (error) {
         if (active) setLoadError(getErrorMessage(error));
       } finally {
@@ -54,7 +67,7 @@ const DataTableParkingFloor = ({
     return () => {
       active = false;
     };
-  }, [parkingLotId, reloadKey, localReload]);
+  }, [page, pageSize, lotId, reloadKey, localReload]);
 
   const handleEdit = async (id: number) => {
     setEditingId(id);
@@ -70,7 +83,11 @@ const DataTableParkingFloor = ({
     try {
       await deleteParkingFloor(floor.id);
       messageApi.success("Piso eliminado correctamente.");
-      setLocalReload((key) => key + 1);
+      if (page > 1 && floors.length === 1) {
+        setPage(page - 1);
+      } else {
+        setLocalReload((key) => key + 1);
+      }
     } catch (error) {
       messageApi.error(`No se pudo eliminar el piso: ${getErrorMessage(error)}`);
     } finally {
@@ -81,9 +98,8 @@ const DataTableParkingFloor = ({
   const columns: TableProps<ParkingFloor>["columns"] = [
     {
       title: "Estacionamiento",
-      dataIndex: "parkingLot",
-      key: "parkingLot",
-      render: (parkingLot: ParkingFloor["parkingLot"]) => parkingLot.name,
+      dataIndex: ["lot", "name"],
+      key: "lot",
     },
     {
       title: "Número de piso",
@@ -122,7 +138,7 @@ const DataTableParkingFloor = ({
           </Button>
           <Popconfirm
             title="Eliminar piso"
-            description={`¿Seguro que deseas eliminar el piso ${floor.floorNumber} de "${floor.parkingLot.name}"?`}
+            description={`¿Seguro que deseas eliminar el piso ${floor.floorNumber} de "${floor.lot.name}"?`}
             okText="Eliminar"
             cancelText="Cancelar"
             okButtonProps={{
@@ -170,11 +186,21 @@ const DataTableParkingFloor = ({
         dataSource={floors}
         loading={loading}
         locale={{
-          emptyText: parkingLotId
+          emptyText: lotId
             ? "Este estacionamiento aún no tiene pisos."
             : "No hay pisos registrados.",
         }}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{
+          current: page,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          style: { paddingRight: "24px" },
+        }}
+        onChange={(pagination) => {
+          setPage(pagination.current ?? 1);
+          setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
+        }}
       />
     </>
   );

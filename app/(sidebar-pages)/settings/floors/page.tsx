@@ -24,17 +24,17 @@ function getErrorMessage(error: unknown) {
 function getParkingFloorFields(
   values: Record<string, unknown>,
 ): ParkingFloorFields {
-  const parkingLotId = values.parkingLotId;
+  const lotId = Number(values.lotId);
   const floorNumber = values.floorNumber;
 
-  if (typeof parkingLotId !== "number" || !Number.isInteger(parkingLotId)) {
+  if (!Number.isInteger(lotId)) {
     throw new Error("El estacionamiento es obligatorio.");
   }
   if (typeof floorNumber !== "number" || !Number.isInteger(floorNumber)) {
     throw new Error("El número de piso debe ser un número entero.");
   }
 
-  return { parkingLotId, floorNumber };
+  return { lotId, floorNumber };
 }
 
 const ParkingFloorsPage = () => {
@@ -48,6 +48,8 @@ const ParkingFloorsPage = () => {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const defaultLotId =
+    filterLotId ?? (lots[0] ? Number(lots[0].id) : undefined);
 
   useEffect(() => {
     let active = true;
@@ -67,7 +69,7 @@ const ParkingFloorsPage = () => {
   const openCreateModal = () => {
     form.resetFields();
     form.setFieldsValue({
-      parkingLotId: filterLotId ?? lots[0]?.id,
+      lotId: defaultLotId,
       floorNumber: 1,
     });
     setMode("create");
@@ -80,7 +82,7 @@ const ParkingFloorsPage = () => {
       const floor = await getParkingFloor(id);
       form.resetFields();
       form.setFieldsValue({
-        parkingLotId: floor.parkingLot.id,
+        lotId: Number(floor.lot.id),
         floorNumber: floor.floorNumber,
       });
       setMode("edit");
@@ -114,7 +116,7 @@ const ParkingFloorsPage = () => {
         await updateParkingFloor(selectedFloor.id, fields);
         messageApi.success("Piso actualizado correctamente.");
       }
-      setFilterLotId(fields.parkingLotId);
+      setFilterLotId(fields.lotId);
       setModalOpen(false);
       setSelectedFloor(null);
       form.resetFields();
@@ -171,7 +173,7 @@ const ParkingFloorsPage = () => {
               onChange={setFilterLotId}
               options={lots.map((lot) => ({
                 label: lot.name,
-                value: lot.id,
+                value: Number(lot.id),
               }))}
             />
             <Button
@@ -186,7 +188,7 @@ const ParkingFloorsPage = () => {
         }
       >
         <DataTableParkingFloor
-          parkingLotId={filterLotId}
+          lotId={filterLotId}
           reloadKey={reloadKey}
           onEdit={openEditModal}
         />
@@ -210,11 +212,11 @@ const ParkingFloorsPage = () => {
           initialValues={
             selectedFloor
               ? {
-                  parkingLotId: selectedFloor.parkingLot.id,
+                  lotId: Number(selectedFloor.lot.id),
                   floorNumber: selectedFloor.floorNumber,
                 }
               : {
-                  parkingLotId: filterLotId ?? lots[0]?.id,
+                  lotId: defaultLotId,
                   floorNumber: 1,
                 }
           }

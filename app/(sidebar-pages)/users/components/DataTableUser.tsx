@@ -178,6 +178,7 @@ const DataTableUser = ({
           pageSize,
           total,
           showSizeChanger: true,
+          style: { paddingRight: "24px" },
         }}
         onChange={(pagination) => {
           setPage(pagination.current ?? 1);

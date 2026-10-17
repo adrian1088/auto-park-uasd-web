@@ -14,11 +14,14 @@ type Props = {
 const FormParkingFloor = ({ form, lots, initialValues, onSubmit }: Props) => {
   const fields: FieldConfig[] = [
     {
-      name: "parkingLotId",
+      name: "lotId",
       label: "Estacionamiento",
       type: "select",
       required: true,
-      options: lots.map((lot) => ({ label: lot.name, value: lot.id })),
+      options: lots.map((lot) => ({
+        label: lot.name,
+        value: Number(lot.id),
+      })),
       span: 24,
     },
     {
