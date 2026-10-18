@@ -4,12 +4,13 @@ import { Form, type FormInstance } from "antd";
 import { DynamicForm, type FieldConfig } from "@/app/components/form";
 
 const baseFields: FieldConfig[] = [
-  { name: "name", label: "Nombre", type: "text", required: true },
+  { name: "name", label: "Nombre", type: "text", required: true, span: 24 },
   {
     name: "email",
     label: "Correo",
     type: "text",
     required: true,
+    span: 24,
     rules: [{ type: "email", message: "Correo inválido" }],
   },
   { name: "phone", label: "Teléfono", type: "text", required: true },

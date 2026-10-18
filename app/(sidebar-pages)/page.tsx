@@ -85,7 +85,7 @@ const HomePage = () => {
         <Col span={6}>
           <Card variant="borderless">
             <Statistic
-              title="Disponibles"
+              title="Espacios Disponibles"
               value={11}
               precision={0}
               styles={{
@@ -98,7 +98,7 @@ const HomePage = () => {
         <Col span={6}>
           <Card variant="borderless">
             <Statistic
-              title="Ocupados"
+              title="Espacios Ocupados"
               value={9}
               precision={0}
               styles={{
@@ -111,7 +111,7 @@ const HomePage = () => {
         <Col span={6}>
           <Card variant="borderless">
             <Statistic
-              title="Reservados"
+              title="Espacios Reservados"
               value={9}
               precision={0}
               styles={{ content: { color: "#1890ff" }, title: { fontSize: 20 } }}
@@ -121,7 +121,7 @@ const HomePage = () => {
         <Col span={6}>
           <Card variant="borderless">
             <Statistic
-              title="Fuera de Servicio"
+              title="Espacios Fuera de Servicio"
               value={9}
               precision={0}
               styles={{ content: { color: "#fa8c16" }, title: { fontSize: 20 } }}
