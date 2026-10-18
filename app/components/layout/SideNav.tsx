@@ -5,6 +5,7 @@ import {
   CalendarOutlined,
   CreditCardOutlined,
   SettingOutlined,
+  TagOutlined,
 } from "@ant-design/icons";
 
 export type SidebarNavItemConfig = {
@@ -105,20 +106,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
     matchPrefixes: ["/"],
   },
   {
-    key: "rates",
-    label: "Tarifas",
-    href: "/rates",
-    icon: <DollarOutlined />,
-    matchPrefixes: ["/rates"],
-  },
-  {
-    key: "users",
-    label: "Usuarios",
-    href: "/users",
-    icon: <UserOutlined />,
-    matchPrefixes: ["/users"],
-  },
-  {
     key: "reservations",
     label: "Reservaciones",
     href: "/reservations",
@@ -133,11 +120,30 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
     matchPrefixes: ["/payments"],
   },
   {
+    key: "tickets",
+    label: "Tickets",
+    href: "/tickets",
+    icon: <TagOutlined />,
+    matchPrefixes: ["/tickets"],
+  },
+  {
     key: "settings",
     icon: <SettingOutlined />,
     label: "Configuraciones",
     matchPrefixes: ["/settings"],
     children: [
+      {
+        key: "users",
+        label: "Usuarios",
+        href: "/settings/users",
+        matchPrefixes: ["/settings/users"],
+      },
+      {
+        key: "rates",
+        label: "Tarifas",
+        href: "/settings/rates",
+        matchPrefixes: ["/settings/rates"],
+      },
       {
         key: "profile",
         href: "/settings/lots",
