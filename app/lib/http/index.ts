@@ -8,8 +8,8 @@ export const http = createHttpClient({
   storage: httpConfig.tokenStorage === 'cookie' ? cookieTokenStorage : localStorageTokenStorage,
   authPath: httpConfig.authPath,
   onAuthFailure: () => {
-    if (typeof window !== 'undefined' && window.location.pathname !== httpConfig.signInPath) {
-      window.location.assign(httpConfig.signInPath);
+    if (typeof window !== 'undefined' && window.location.pathname !== httpConfig.loginPath) {
+      window.location.assign(httpConfig.loginPath);
     }
   },
 });

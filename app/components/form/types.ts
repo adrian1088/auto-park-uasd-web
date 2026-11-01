@@ -117,6 +117,10 @@ export interface DynamicFormProps {
   /** Hide the built-in buttons (e.g. when rendered inside a Modal). */
   hideActions?: boolean;
   footer?: ReactNode;
+  styles?: {
+    label?: React.CSSProperties;
+    content?: React.CSSProperties;
+  };
 }
 
 export class FormFieldsError extends Error {

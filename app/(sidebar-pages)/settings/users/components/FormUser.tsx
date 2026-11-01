@@ -30,14 +30,19 @@ const baseFields: FieldConfig[] = [
 type Props = {
   form: FormInstance;
   initialValues?: Record<string, unknown>;
+  mode?: "create" | "edit";
   onSubmit: (values: Record<string, unknown>) => void | Promise<void>;
 };
 
-const FormUser = ({ form, initialValues, onSubmit }: Props) => {
+const FormUser = ({ form, initialValues, onSubmit, mode }: Props) => {
+  const fields =
+    mode === "create"
+      ? baseFields.filter((field) => field.name !== "active")
+      : baseFields;
   return (
     <DynamicForm
       form={form}
-      fields={baseFields}
+      fields={fields}
       columns={2}
       initialValues={initialValues}
       onSubmit={onSubmit}

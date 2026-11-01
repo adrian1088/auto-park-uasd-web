@@ -96,6 +96,25 @@ const DataTableUser = ({
     }
   };
 
+  const renderStatus = (status: string) => {
+    const _status = status.toUpperCase();
+    const color: Record<string, string> = {
+      ACTIVE: "green",
+      INACTIVE: "default",
+      PENDING_ACTIVATION: "orange",
+    };
+    const label: Record<string, string> = {
+      ACTIVE: "Activo",
+      INACTIVE: "Inactivo",
+      PENDING_ACTIVATION: "Pendiente de activación",
+    };
+    return (
+      <Tag color={color[_status] ?? "default"}>
+        {label[_status] ?? status}
+      </Tag>
+    );
+  };
+
   const columns: TableProps<User>["columns"] = [
     { title: "Nombre", dataIndex: "name", key: "name" },
     { title: "Correo", dataIndex: "email", key: "email" },
@@ -105,11 +124,7 @@ const DataTableUser = ({
       title: "Estado",
       dataIndex: "status",
       key: "status",
-      render: (status: string) => (
-        <Tag color={status === "active" ? "green" : "default"}>
-          {status === "active" ? "Activo" : "Inactivo"}
-        </Tag>
-      ),
+      render: renderStatus,
     },
     {
       title: "Acciones",
