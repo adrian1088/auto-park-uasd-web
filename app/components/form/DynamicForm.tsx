@@ -29,6 +29,7 @@ const DynamicForm = ({
   showReset,
   hideActions,
   footer,
+  styles,
 }: DynamicFormProps) => {
   const [internalForm] = Form.useForm();
   const form = externalForm ?? internalForm;
@@ -70,6 +71,7 @@ const DynamicForm = ({
       scrollToFirstError
       preserve={false}
       requiredMark="optional"
+      styles={styles}
     >
       {allSections.map((section, index) => (
         <Form.Item noStyle shouldUpdate key={index}>
@@ -122,4 +124,3 @@ const DynamicForm = ({
 };
 
 export default DynamicForm;
-

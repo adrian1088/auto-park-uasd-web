@@ -59,6 +59,7 @@ function toFormValues(rate: Rate) {
 }
 
 const RatesPage = () => {
+  const [form] = Form.useForm();
   const [reloadKey, setReloadKey] = useState(0);
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [filterLotId, setFilterLotId] = useState<number | undefined>();
@@ -67,7 +68,6 @@ const RatesPage = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [selectedRate, setSelectedRate] = useState<Rate | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
   useEffect(() => {

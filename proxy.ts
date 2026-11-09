@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/sign-in", "/check-in", "/check-out"];
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/check-in",
+  "/check-out",
+  "/password-change",
+  "/confirm-email",
+  "/forgot-password",
+  "/activate-email",
+  "/activate-email-password",
+];
 const isPublic = (p: string) =>
   PUBLIC_PATHS.some((x) => p === x || p.startsWith(`${x}/`));
 
 // Cookies httpOnly que indican sesión (access o refresh; si solo queda el refresh,
 // el cliente HTTP renueva el access token en la primera request).
-const sessionCookies = (process.env.AUTH_COOKIE_NAMES ?? "Authentication,Refresh")
+const sessionCookies = (
+  process.env.AUTH_COOKIE_NAMES ?? "Authentication,Refresh"
+)
   .split(",")
   .map((n) => n.trim())
   .filter(Boolean);
 
 export function proxy(request: NextRequest) {
   // En modo localStorage el servidor no ve el token; la guarda va en el cliente.
-  if (process.env.NEXT_PUBLIC_TOKEN_STORAGE !== "cookie") return NextResponse.next();
+  if (process.env.NEXT_PUBLIC_TOKEN_STORAGE !== "cookie")
+    return NextResponse.next();
 
   const { pathname } = request.nextUrl;
   const hasSession = sessionCookies.some((n) => request.cookies.has(n));

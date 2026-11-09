@@ -9,3 +9,10 @@ export const requiredText = (
   }
   return value.trim();
 };
+
+export const getErrorMessage = (error: unknown) => {
+  console.log("🚀 ~ getErrorMessage ~ error:", error);
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error inesperado.";
+};

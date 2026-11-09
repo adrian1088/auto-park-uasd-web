@@ -1,5 +1,15 @@
 import { http } from "@/app/lib/http";
 import type { ApiResponseWithPagination, ApiResponse, ApiParamsPagination } from "@/app/lib/api/base";
+export enum UserRole {
+  ADMIN = "ADMIN",
+  USER = "USER",
+}
+
+export enum UserStatus {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+  PENDING_ACTIVATION = "PENDING_ACTIVATION",
+}
 
 export type User = {
   id: number;
@@ -8,8 +18,8 @@ export type User = {
   name: string;
   email: string;
   phone: string;
-  role: string;
-  status: string;
+  role: UserRole;
+  status?: UserStatus;
 };
 
 export type UserFields = Pick<

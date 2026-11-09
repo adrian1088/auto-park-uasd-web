@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import {
   Alert,
   Button,
@@ -8,15 +8,15 @@ import {
   Input,
   Typography,
   message,
-} from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { login } from '@/app/lib/api/auth';
-import { http, HttpError } from '@/app/lib/http';
+} from "antd";
+import Image from "next/image";
+import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { login } from "@/app/lib/api/auth";
+import { http, HttpError } from "@/app/lib/http";
 
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text, Link } = Typography;
 
 const SignInPage = () => {
   const router = useRouter();
@@ -27,7 +27,7 @@ const SignInPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/');
+      router.replace("/");
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -41,14 +41,16 @@ const SignInPage = () => {
 
     try {
       await login(values.identifier, values.password);
-      message.success('Bienvenido de nuevo');
-      const next = new URLSearchParams(window.location.search).get('next');
-      router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/');
+      message.success("Bienvenido de nuevo");
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.replace(
+        next && next.startsWith("/") && !next.startsWith("//") ? next : "/",
+      );
     } catch (error) {
       setErrorMessage(
         error instanceof HttpError && error.status === 401
-          ? 'Credenciales inválidas. Verifica tu usuario/correo y contraseña.'
-          : 'No se pudo iniciar sesión',
+          ? "Credenciales inválidas. Verifica tu usuario/correo y contraseña."
+          : "No se pudo iniciar sesión",
       );
     } finally {
       setSubmitting(false);
@@ -67,9 +69,19 @@ const SignInPage = () => {
       }}
       vertical
     >
-
-      <Title level={1}>Auto Park UASD</Title>
-      <Title level={2}>Iniciar sesión</Title>
+      <Image
+        src="/images/logo.png"
+        alt="Auto Park UASD"
+        width={855}
+        height={247}
+        style={{
+          width: "100%",
+          maxWidth: 300,
+          height: "auto",
+          marginBottom: 44,
+        }}
+      />
+      <Title level={4}>Iniciar Sesión</Title>
       <Paragraph style={{ textAlign: "center" }} type="secondary">
         Usa tu nombre de usuario o dirección de correo electrónico para ingresar
         a la plataforma.
@@ -113,20 +125,25 @@ const SignInPage = () => {
             { required: true, message: "Por favor ingresa tu contraseña!" },
           ]}
         >
-          <Input
+          <Input.Password
             size="large"
             prefix={<LockOutlined />}
-            type="password"
             placeholder="Contraseña"
             autoComplete="current-password"
+
           />
         </Form.Item>
         <Form.Item>
           <Flex justify="space-between" align="center">
             <Form.Item name="remember" valuePropName="checked" noStyle>
-              <Checkbox>Recuérdame</Checkbox>
+              <Checkbox>
+                {" "}
+                <Text>Recuérdame</Text>{" "}
+              </Checkbox>
             </Form.Item>
-            <Link href="/forgot-password">Olvidaste tu contraseña</Link>
+            <Link href="/forgot-password" style={{ fontSize: 14 }}>
+              Olvidaste tu contraseña
+            </Link>
           </Flex>
         </Form.Item>
 
@@ -142,9 +159,14 @@ const SignInPage = () => {
           </Button>
         </Form.Item>
       </Form>
+      <Flex justify="center" align="center" gap={4} style={{ marginTop: 16 }}>
+        <Text>¿No tienes una cuenta? </Text>
+        <Link href="/sign-up" style={{ fontSize: 14 }}>
+          Regístrate
+        </Link>
+      </Flex>
     </Flex>
   );
 };
 
 export default SignInPage;
-

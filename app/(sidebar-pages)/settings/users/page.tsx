@@ -3,7 +3,7 @@
 import { Button, Card, Flex, Form, message, Modal } from "antd";
 import { useState } from "react";
 import HeaderPage from "@/app/components/HeaderPage";
-import { createUser, getUser, updateUser } from "@/app/lib/api/users";
+import { createUser, getUser, updateUser, UserRole, UserStatus } from "@/app/lib/api/users";
 import type { User, UserFields } from "@/app/lib/api/users";
 import { requiredText } from "@/app/lib/utils";
 import DataTableUser from "./components/DataTableUser";
@@ -16,8 +16,11 @@ function getErrorMessage(error: unknown) {
     : "Ocurrió un error inesperado.";
 }
 
-function getUserFields(values: Record<string, unknown>): UserFields {
-  if (typeof values.active !== "boolean") {
+function getUserFields(
+  values: Record<string, unknown>,
+  mode: "create" | "edit",
+): UserFields {
+  if (mode === "edit" && typeof values.active !== "boolean") {
     throw new Error("El estado del usuario es obligatorio.");
   }
 
@@ -25,9 +28,14 @@ function getUserFields(values: Record<string, unknown>): UserFields {
     name: requiredText(values, "name", "El nombre"),
     email: requiredText(values, "email", "El correo"),
     phone: requiredText(values, "phone", "El teléfono"),
-    role: requiredText(values, "role", "El rol"),
-    status: values.active ? "active" : "inactive",
-  };
+    role: requiredText(values, "role", "El rol")     as UserRole,
+        status:
+          mode === "edit"
+            ? values.active
+              ? UserStatus.ACTIVE
+              : UserStatus.INACTIVE
+            : undefined,
+      };
 }
 
 const UsersPage = () => {
@@ -46,7 +54,6 @@ const UsersPage = () => {
       email: "",
       phone: "",
       role: undefined,
-      active: true,
     });
     setMode("create");
     setSelectedUser(null);
@@ -62,7 +69,7 @@ const UsersPage = () => {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        active: user.status === "active",
+        active: user.status === UserStatus.ACTIVE,
       });
       setMode("edit");
       setSelectedUser(user);
@@ -84,7 +91,7 @@ const UsersPage = () => {
   const handleSubmit = async (values: Record<string, unknown>) => {
     setSaving(true);
     try {
-      const userFields = getUserFields(values);
+      const userFields = getUserFields(values, mode);
       if (mode === "create") {
         await createUser(userFields);
         messageApi.success("Usuario creado correctamente.");
@@ -159,10 +166,11 @@ const UsersPage = () => {
                   email: selectedUser.email,
                   phone: selectedUser.phone,
                   role: selectedUser.role,
-                  active: selectedUser.status === "active",
+                  active: selectedUser.status === UserStatus.ACTIVE,
                 }
-              : { active: true }
+              : undefined
           }
+          mode={mode}
           onSubmit={handleSubmit}
         />
       </Modal>

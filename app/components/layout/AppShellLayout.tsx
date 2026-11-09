@@ -1,14 +1,10 @@
 "use client";
-import { Button, Layout, Menu, MenuProps, Typography } from "antd";
+
+import { Button, Flex, Layout, Menu, MenuProps, Typography } from "antd";
+import Image from "next/image";
 import { useState } from "react";
-import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-} from "@ant-design/icons";
-import {
-  getSidebarNavState,
-  SidebarNavItemConfig,
-} from "./SideNav";
+import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
+import { getSidebarNavState, SidebarNavItemConfig } from "./SideNav";
 import { CurrentUser, HeaderUserSection } from "./HeaderUserSection";
 import Link from "next/link";
 
@@ -36,7 +32,6 @@ function buildMenuItems(
   can: SidebarNavProps["can"],
 ): SidebarMenuItem[] {
   return items.map((item) => {
-
     if (item.children?.length) {
       return {
         key: item.key,
@@ -85,22 +80,51 @@ const AppShellLayout = ({
         onCollapse={(value) => setCollapsed(value)}
         breakpoint="lg"
       >
-        <div style={{ padding: 24 }}>
+        <Flex
+          align="center"
+          justify="center"
+          style={{
+            paddingLeft: "16px",
+            paddingRight: "16px",
+            paddingTop: "4px",
+            paddingBottom: "8px",
+          }}
+          vertical
+        >
           {collapsed ? (
-            <Title level={3} style={{ color: "white", margin: 0 }}>
-              AP
-            </Title>
+            <Image
+              src="/images/logo-without-name.png"
+              alt="Auto Park UASD"
+              width={40}
+              height={60}
+              style={{
+                width: "100%",
+                maxWidth: 60,
+                height: "auto",
+              }}
+            />
           ) : (
-            <>
-              <Title level={3} style={{ color: "white", margin: 0 }}>
-                AutoPark
-              </Title>
-              <Text style={{ color: "rgba(255,255,255,0.65)" }}>
-                Sistema de gestión de parqueos
-              </Text>
-            </>
+            <Image
+              src="/images/logo2.png"
+              alt="Auto Park UASD"
+              width={230}
+              height={60}
+              style={{
+                width: "100%",
+                maxWidth: 230,
+                height: "auto",
+              }}
+            />
+            // <>
+            //   <Title level={3} style={{ color: "white", margin: 0 }}>
+            //     AutoPark
+            //   </Title>
+            //   <Text style={{ color: "rgba(255,255,255,0.65)" }}>
+            //     Sistema de gestión de parqueos
+            //   </Text>
+            // </>
           )}
-        </div>
+        </Flex>
 
         <Menu
           theme="dark"

@@ -235,7 +235,8 @@ const FieldRenderer = ({ field, columns, formDisabled }: Props) => {
                 form={form}
                 values={values}
                 disabled={disabled}
-                valuePropName={valuePropName}
+                valuepropname={valuePropName}
+                style={{ marginTop: 0, marginBottom: 0 }}
               />
             </Form.Item>
           </Col>
