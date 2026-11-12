@@ -1,6 +1,6 @@
 "use client";
 
-import { Form, type FormInstance } from "antd";
+import { type FormInstance } from "antd";
 import { DynamicForm, type FieldConfig } from "@/app/components/form";
 
 const baseFields: FieldConfig[] = [
@@ -51,5 +51,4 @@ const FormUser = ({ form, initialValues, onSubmit, mode }: Props) => {
   );
 };
 
-export { Form };
 export default FormUser;

@@ -13,20 +13,21 @@ import { getErrorMessage } from "@/app/lib/utils";
 const { Title, Text } = Typography;
 
 function getConfirmEmailFields(values: Record<string, unknown>) {
-  const { password, confirmNewPassword } = values;
-  if (!password) {
+  const { newPassword, confirmNewPassword } = values;
+  console.log("🚀 ~ getConfirmEmailFields ~ values:", values)
+  if (!newPassword) {
     throw new Error("La contraseña es obligatoria");
   }
   if (!confirmNewPassword) {
     throw new Error("La confirmación de la nueva contraseña es obligatoria");
   }
-  if (password !== confirmNewPassword) {
+  if (newPassword !== confirmNewPassword) {
     throw new Error("Las contraseñas no coinciden");
   }
 
 
   return {
-    password: String(password),
+    password: String(newPassword),
   };
 }
 
@@ -36,7 +37,7 @@ const PasswordChangePage = () => {
   const hashParam = searchParams.get("hash");
   const expiresParam = searchParams.get("expires");
 
-  const initialValues = { password: "", confirmNewPassword: "" };
+  const initialValues = { newPassword: "", confirmNewPassword: "" };
   const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();

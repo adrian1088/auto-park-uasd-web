@@ -11,6 +11,8 @@ export type TicketStatus = "ACTIVE" | "PAID" | "CANCELLED" | "COMPLETED";
 export type Ticket = {
   id: number;
   code: string;
+  plateNumber?: string; 
+  spotNumber?: string;
   entranceAt: string;
   exitAt: string | null;
   status: TicketStatus;

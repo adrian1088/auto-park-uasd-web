@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Popconfirm, Space, Table, message } from "antd";
+import { Alert, Button, Popconfirm, Space, Table, Tag, message } from "antd";
 import type { TableProps } from "antd";
 import { useEffect, useState } from "react";
 import { deletePayment, getPaymentsPaginated } from "@/app/lib/api/payments";
@@ -20,15 +20,11 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
 };
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
+  return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
 }
 
 export type DataTablePaymentProps = {
-  /** Filtros que se envían al servidor. */
   filters: PaymentFilters;
-  /** Cambiar este valor fuerza una recarga del listado. */
   reloadKey?: number;
   onEdit: (id: number) => Promise<void>;
 };
@@ -49,7 +45,6 @@ const DataTablePayment = ({
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // Al cambiar los filtros se vuelve a la primera página.
   const [prevFilters, setPrevFilters] = useState(filters);
   if (prevFilters !== filters) {
     setPrevFilters(filters);
@@ -112,24 +107,33 @@ const DataTablePayment = ({
 
   const columns: TableProps<Payment>["columns"] = [
     {
-      title: "Ticket",
+      title: "Origen / Referencia",
       key: "ticket",
-      render: (_value, payment) => payment.ticket.code,
+      render: (_value, payment) => {
+        if (payment.ticket?.code) {
+          return <Tag color="blue">Ticket #{payment.ticket.code}</Tag>;
+        }
+        return <Tag color="purple">Renovación de Suscripción</Tag>;
+      },
     },
     {
       title: "Monto",
       dataIndex: "amount",
       key: "amount",
-      render: formatMoney,
+      render: (val) => (
+        <span style={{ fontWeight: "bold", color: "#3f8600" }}>
+          {formatMoney(val)}
+        </span>
+      ),
     },
     {
-      title: "Método",
+      title: "Método de Pago",
       dataIndex: "method",
       key: "method",
-      render: (method: PaymentMethod) => paymentMethodLabels[method],
+      render: (method: PaymentMethod) => paymentMethodLabels[method] || method,
     },
     {
-      title: "Fecha",
+      title: "Fecha de Registro",
       dataIndex: "date",
       key: "date",
       render: formatDateTime,
@@ -145,11 +149,11 @@ const DataTablePayment = ({
             disabled={editingId !== null}
             onClick={() => void handleEdit(payment.id)}
           >
-            Editar
+            Auditar
           </Button>
           <Popconfirm
-            title="Eliminar pago"
-            description="¿Seguro que deseas eliminar este pago?"
+            title="Eliminar registro financiero"
+            description="¿Seguro que deseas eliminar esta transacción?"
             okText="Eliminar"
             cancelText="Cancelar"
             okButtonProps={{ danger: true, loading: deletingId === payment.id }}
@@ -179,10 +183,7 @@ const DataTablePayment = ({
           title="No se pudieron cargar los pagos."
           description={loadError}
           action={
-            <Button
-              size="small"
-              onClick={() => setLocalReload((key) => key + 1)}
-            >
+            <Button size="small" onClick={() => setLocalReload((key) => key + 1)}>
               Reintentar
             </Button>
           }

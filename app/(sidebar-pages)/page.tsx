@@ -1,19 +1,8 @@
 "use client";
-import {
-  Button,
-  Card,
-  Col,
-  Flex,
-  Row,
-  Statistic,
-  Table,
-  TableProps,
-  Tag,
-  Typography,
-} from "antd";
-import { useRouter } from "next/navigation";
 
-const { Title, Paragraph } = Typography;
+import React from "react";
+import { Card, Col, Flex, Row, Statistic, Table, TableProps} from "antd";
+
 
 interface DataType {
   key: string;
@@ -48,39 +37,14 @@ const columns: TableProps<DataType>['columns'] = [
 ];
 
 const data: DataType[] = [
-  {
-    key: "1",
-    floor: "Piso 1",
-    totalSpace: 32,
-    occupied: 9,
-    available: 23,
-  },
-  {
-    key: "2",
-    floor: "Piso 2",
-    totalSpace: 42,
-    occupied: 10,
-    available: 32,
-  },
-  {
-    key: "3",
-    floor: "Piso 3",
-    totalSpace: 32,
-    occupied: 8,
-    available: 24,
-  },
+  { key: "1", floor: "Piso 1", totalSpace: 32, occupied: 9, available: 23 },
+  { key: "2", floor: "Piso 2", totalSpace: 42, occupied: 10, available: 32 },
+  { key: "3", floor: "Piso 3", totalSpace: 32, occupied: 8, available: 24 },
 ];
 
-const HomePage = () => {
+export default function HomePage() {
   return (
-    <Flex
-      gap={16}
-      flex={1}
-      // justify="center"
-      // align="center"
-      // style={{ width: "100%", minHeight: "100vh", padding: 24 }}
-      vertical
-    >
+    <Flex gap={16} flex={1} vertical>
       <Row gutter={16}>
         <Col span={6}>
           <Card variant="borderless">
@@ -133,18 +97,12 @@ const HomePage = () => {
       <Row gutter={16}>
         <Col span={18}>
           <Card title="Ocupación del Parqueo" variant="borderless">
-            <p>
-              Aqui se mostraria grafico lineal que mostraria ocupacion mensual
-              en porcentaje.
-            </p>
+            <p>Aquí se mostraría gráfico lineal que mostraría ocupación mensual en porcentaje.</p>
           </Card>
         </Col>
         <Col span={6}>
           <Card title="Ocupación por Piso" variant="borderless">
-            <p>
-              Aqui se mostraria grafico de barras que mostraria otras
-              estadisticas relevantes del parqueo.
-            </p>
+            <p>Aquí se mostraría gráfico de barras que mostraría otras estadísticas relevantes del parqueo.</p>
           </Card>
         </Col>
       </Row>
@@ -156,29 +114,11 @@ const HomePage = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card title="Metodos de Pago" variant="borderless">
-            <p>Aqui se mostraria otras estadisticas relevantes del parqueo.</p>
+          <Card title="Métodos de Pago" variant="borderless">
+            <p>Aquí se mostrarían otras estadísticas relevantes del parqueo.</p>
           </Card>
         </Col>
       </Row>
-
-      {/* <Card style={{ width: "100%", maxWidth: 760 }}>
-        <Space size={16} style={{ width: "100%" }} vertical>
-          <Title level={1} style={{ marginBottom: 0 }}>
-            Welcome back José Maldonado
-          </Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-            eiusmod tempor incididunt ut labore et dolore magna aliqua.
-          </Paragraph>
-
-          <Space>
-            <Button onClick={() => void onLogout()}>Logout</Button>
-          </Space>
-        </Space>
-      </Card> */}
     </Flex>
   );
-};
-
-export default HomePage;
+}
