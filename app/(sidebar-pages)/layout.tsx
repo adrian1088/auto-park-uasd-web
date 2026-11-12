@@ -14,24 +14,38 @@ const LayoutShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Modo localStorage: sin token no hay acceso (en modo cookie lo resuelve proxy.ts).
+  // Modo localStorage
   useEffect(() => {
     if (http.storage.exposesToken && !http.storage.get()) {
       router.replace("/sign-in");
     }
   }, [pathname, router]);
 
+  // ATAJO DE TECLADO: Ctrl + Shift + E para abrir la pantalla de entrada (/entrance) en nueva pestaña
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        window.open("/customer-panel", "_blank");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   // Carga el usuario autenticado (/me) al entrar a las rutas privadas, p. ej. tras el sign-in.
   useEffect(() => {
     let active = true;
     getCurrentUser()
-      .then((response) =>{
-      console.log("🚀 ~ LayoutShell ~ response:", response)
-
-
-
-         active && setCurrentUser(response)
-        })
+      .then((response) => {
+        console.log("~ LayoutShell ~ response:", response);
+        if (active) {
+          setCurrentUser(response);
+        }
+      })
       .catch(() => active && setCurrentUser(null));
     return () => {
       active = false;
@@ -43,7 +57,7 @@ const LayoutShell = ({ children }: { children: React.ReactNode }) => {
     try {
       await logout();
     } catch {
-      // la sesión local se limpia igualmente
+      // la sesión local se limpia 
     } finally {
       router.replace("/sign-in");
       setIsLoggingOut(false);

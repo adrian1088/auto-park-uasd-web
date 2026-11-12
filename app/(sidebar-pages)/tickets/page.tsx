@@ -1,3 +1,4 @@
+// app/admin/tickets/page.tsx (o tu ruta correspondiente)
 "use client";
 
 import { Card, Flex, message, Modal, Spin, Tag } from "antd";
@@ -68,6 +69,16 @@ const TicketsPage = () => {
               columns={2}
               items={[
                 { key: "code", label: "Código", content: selectedTicket.code },
+                {
+                  key: "plateNumber",
+                  label: "Matrícula",
+                  content: selectedTicket.plateNumber || "N/A",
+                },
+                {
+                  key: "spotNumber",
+                  label: "Espacio",
+                  content: selectedTicket.spotNumber || "VIP",
+                },
                 {
                   key: "status",
                   label: "Estado",

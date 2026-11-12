@@ -11,9 +11,9 @@ export const paymentMethodOptions = Object.entries(paymentMethodLabels).map(
 const baseFields: FieldConfig[] = [
   {
     name: "ticketId",
-    label: "ID del ticket",
+    label: "ID del ticket (Opcional para Suscripciones)",
     type: "number",
-    required: true,
+    required: false, 
     props: { min: 1, precision: 0 },
   },
   {

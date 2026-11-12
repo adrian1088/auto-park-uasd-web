@@ -1,3 +1,4 @@
+// app/(sidebar-pages)/parking/spaces/page.tsx (o tu ruta correspondiente)
 "use client";
 
 import { PlusOutlined } from "@ant-design/icons";
@@ -94,24 +95,35 @@ const ParkingSpacesPage = () => {
       ? [...floors, selectedSpace.floor]
       : floors;
 
-  const loadLots = () =>
+// Cargar estacionamientos y seleccionar automáticamente el primero por defecto
+  useEffect(() => {
     getParkingLots()
       .then((data) => {
         setLoadError(null);
         setLots(data);
+        if (data.length > 0 && filterLotId === undefined) {
+          setFilterLotId(Number(data[0].id));
+        }
       })
       .catch((error: unknown) => setLoadError(getErrorMessage(error)));
+  }, [filterLotId]);
 
-  useEffect(() => {
-    void loadLots();
-  }, []);
-
+  // Cargar pisos del estacionamiento activo y seleccionar automáticamente el primero
   useEffect(() => {
     if (floorsLotId === undefined) return;
     let active = true;
     getParkingFloors(floorsLotId)
       .then((data) => {
-        if (active) setFloors(data);
+        if (active) {
+          setFloors(data);
+          if (data.length > 0) {
+            setFilterFloorId((prev) =>
+              data.some((f) => Number(f.id) === prev) ? prev : Number(data[0].id)
+            );
+          } else {
+            setFilterFloorId(undefined);
+          }
+        }
       })
       .catch((error: unknown) => {
         if (active) setLoadError(getErrorMessage(error));
@@ -202,7 +214,7 @@ const ParkingSpacesPage = () => {
       {contextHolder}
       <HeaderPage
         title="Espacios de estacionamiento"
-        description="Administrar los espacios disponibles en cada piso."
+        description="Administrar los espacios disponibles en cada piso de forma ordenada."
       />
 
       {loadError && (
@@ -212,7 +224,7 @@ const ParkingSpacesPage = () => {
           title="No se pudieron cargar los estacionamientos y pisos."
           description={loadError}
           action={
-            <Button size="small" onClick={() => void loadLots()}>
+            <Button size="small" onClick={() => void getParkingLots()}>
               Reintentar
             </Button>
           }
@@ -220,14 +232,13 @@ const ParkingSpacesPage = () => {
       )}
 
       <Card
-        title="Todos los espacios"
+        title="Espacios por Sede y Piso"
         styles={{ body: { padding: 0 } }}
         extra={
           <Flex gap={8} wrap>
             <Select
-              allowClear
-              style={{ minWidth: 200 }}
-              placeholder="Todos los estacionamientos"
+              style={{ minWidth: 220 }}
+              placeholder="Seleccione estacionamiento"
               value={filterLotId}
               onChange={(value: number | undefined) => {
                 setFilterLotId(value);
@@ -239,10 +250,9 @@ const ParkingSpacesPage = () => {
               }))}
             />
             <Select
-              allowClear
-              style={{ minWidth: 200 }}
-              placeholder="Todos los pisos"
-              disabled={filterLotId === undefined}
+              style={{ minWidth: 180 }}
+              placeholder="Seleccione piso"
+              disabled={filterLotId === undefined || floors.length === 0}
               value={filterFloorId}
               onChange={setFilterFloorId}
               options={floors.map((floor) => ({

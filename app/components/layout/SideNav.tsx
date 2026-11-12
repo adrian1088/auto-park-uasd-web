@@ -1,9 +1,10 @@
 import {
   AppstoreOutlined,
-  DollarOutlined,
-  UserOutlined,
+  LoginOutlined,    
+  LogoutOutlined,
   CalendarOutlined,
   CreditCardOutlined,
+  UsergroupAddOutlined,
   SettingOutlined,
   TagOutlined,
 } from "@ant-design/icons";
@@ -106,11 +107,32 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItemConfig[] = [
     matchPrefixes: ["/"],
   },
   {
+key: "check-in",
+    href: "/check-in",
+    icon: <LoginOutlined />,
+    label: "Check-In",
+    matchPrefixes: ["/check-in"],
+  },
+  {
+    key: "check-out",
+    href: "/check-out",
+    icon: <LogoutOutlined />,
+    label: "Check-Out",
+    matchPrefixes: ["/check-out"],
+  },
+  {
     key: "reservations",
     label: "Reservaciones",
     href: "/reservations",
     icon: <CalendarOutlined />,
     matchPrefixes: ["/reservations"],
+  },
+  {
+    key: "subscriptions", // nuevo lo puse para clientes fijos
+    label: "Clientes Fijos",
+    href: "/subscriptions",
+    icon: <UsergroupAddOutlined />,
+    matchPrefixes: ["/subscriptions"],
   },
   {
     key: "payments",
