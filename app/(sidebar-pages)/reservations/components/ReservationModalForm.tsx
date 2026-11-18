@@ -1,86 +1,137 @@
 "use client";
 
-import React from "react";
-import { Modal, Form, Select, DatePicker, Button, Space, Alert } from "antd";
+import type { ParkingSpace } from "@/app/lib/api/spaces";
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Space,
+} from "antd";
 import type { FormInstance } from "antd";
-import dayjs from "dayjs";
-import { User } from "@/app/lib/api/reservations";
+import type dayjs from "dayjs";
 
-interface Props {
+type ReservationFormValues = {
+  startTime: dayjs.Dayjs;
+  endTime: dayjs.Dayjs;
+  parkingSpaceId: number;
+  vehiclePlateNumber?: string;
+};
+
+type Props = {
   open: boolean;
   onCancel: () => void;
-  onFinish: (values: { entryTime: dayjs.Dayjs; userId: number }) => void;
+  onFinish: (values: ReservationFormValues) => void | Promise<void>;
   loading: boolean;
-  form: FormInstance;
-  users: User[];
-}
+  form: FormInstance<ReservationFormValues>;
+  spaces: ParkingSpace[];
+};
 
-export const ReservationModalForm: React.FC<Props> = ({
+export const ReservationModalForm = ({
   open,
   onCancel,
   onFinish,
   loading,
   form,
-  users,
-}) => {
+  spaces,
+}: Props) => {
   return (
     <Modal
-      title="Crear Nueva Reservación y Envío de QR"
+      title="Crear reservación"
       open={open}
       onCancel={onCancel}
       footer={null}
       destroyOnHidden
+      closable={!loading}
+      maskClosable={!loading}
     >
-      <Form
+      <Form<ReservationFormValues>
         form={form}
         layout="vertical"
-        onFinish={onFinish}
-        style={{ marginTop: 16 }}
+        onFinish={(values) => void onFinish(values)}
       >
         <Form.Item
-          name="userId"
-          label="Usuario / Cliente"
-          rules={[{ required: true, message: "Selecciona un cliente" }]}
+          name="parkingSpaceId"
+          label="Espacio de estacionamiento"
+          rules={[{ required: true, message: "Selecciona un espacio." }]}
         >
           <Select
             showSearch
-            placeholder="Seleccionar cliente registrado"
-            optionFilterProp="children"
-            options={users.map((u) => ({
-              label: `${u.name} (${u.email})`,
-              value: u.id,
+            optionFilterProp="label"
+            placeholder="Selecciona un espacio"
+            options={spaces.map((space) => ({
+              value: space.id,
+              label: `${space.floor.lot.name} · Piso ${space.floor.floorNumber} · Espacio ${space.spaceNumber}`,
             }))}
           />
         </Form.Item>
 
         <Form.Item
-          name="entryTime"
-          label="Fecha y Hora Estimada de Entrada"
+          name="vehiclePlateNumber"
+          label="Placa del vehículo"
+          extra="Opcional"
+        >
+          <Input placeholder="Ej.: A123456" maxLength={20} />
+        </Form.Item>
+
+        <Form.Item
+          name="startTime"
+          label="Inicio"
+          rules={[{ required: true, message: "Selecciona la fecha de inicio." }]}
+        >
+          <DatePicker
+            showTime
+            format="YYYY-MM-DD HH:mm"
+            style={{ width: "100%" }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="endTime"
+          label="Fin"
+          dependencies={["startTime"]}
           rules={[
-            { required: true, message: "Selecciona la hora de llegada" },
+            { required: true, message: "Selecciona la fecha de fin." },
+            ({ getFieldValue }) => ({
+              validator(_, value: dayjs.Dayjs | undefined) {
+                const startTime = getFieldValue("startTime") as
+                  | dayjs.Dayjs
+                  | undefined;
+                if (!value || !startTime || value.isAfter(startTime)) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(
+                  new Error("La fecha de fin debe ser posterior al inicio."),
+                );
+              },
+            }),
           ]}
         >
           <DatePicker
             showTime
             format="YYYY-MM-DD HH:mm"
             style={{ width: "100%" }}
-            placeholder="Seleccionar fecha y hora de llegada"
           />
         </Form.Item>
 
         <Alert
-          title="Asignación Dinámica al Llegar"
-          description="Al confirmar esta reserva se enviará un código QR único al correo del cliente. El número de espacio físico se asignará de manera automática en la entrada al momento de su llegada."
+          title="Usuario autenticado"
+          description="La reservación se registra para la cuenta con la que iniciaste sesión."
           type="info"
           showIcon
-          style={{ marginBottom: 20, borderRadius: "6px" }}
+          style={{ marginBottom: 20 }}
         />
 
         <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
           <Space>
-            <Button onClick={onCancel}>Cancelar</Button>
+            <Button onClick={onCancel} disabled={loading}>
+              Cancelar
+            </Button>
             <Button type="primary" htmlType="submit" loading={loading}>
-              Confirmar y Enviar QR
+              Crear reservación
             </Button>
           </Space>
         </Form.Item>

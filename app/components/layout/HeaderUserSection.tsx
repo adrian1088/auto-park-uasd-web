@@ -77,7 +77,7 @@ export function HeaderUserSection({
           align="center"
           style={{ cursor: 'pointer', opacity: isLoggingOut ? 0.7 : 1 }}
         >
-          <Avatar fullName={user?.name} />
+          <Avatar fullName={user?.name} maxInitials={2} />
         </Flex>
       </Dropdown>
     </Space>
