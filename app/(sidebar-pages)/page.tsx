@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { Card, Col, Flex, Row, Statistic, Table, TableProps} from "antd";
-
+import { Card, Col, Flex, Row, Statistic, Table, TableProps } from "antd";
 
 interface DataType {
   key: string;
@@ -12,27 +11,27 @@ interface DataType {
   available: number;
 }
 
-const columns: TableProps<DataType>['columns'] = [
+const columns: TableProps<DataType>["columns"] = [
   {
-    title: 'Piso',
-    dataIndex: 'floor',
-    key: 'floor',
+    title: "Piso",
+    dataIndex: "floor",
+    key: "floor",
     render: (text) => <a>{text}</a>,
   },
   {
-    title: 'Total Espacio',
-    dataIndex: 'totalSpace',
-    key: 'totalSpace',
+    title: "Total Espacio",
+    dataIndex: "totalSpace",
+    key: "totalSpace",
   },
   {
-    title: 'Ocupados',
-    dataIndex: 'occupied',
-    key: 'occupied',
+    title: "Ocupados",
+    dataIndex: "occupied",
+    key: "occupied",
   },
   {
-    title: 'Disponibles',
-    key: 'available',
-    dataIndex: 'available',
+    title: "Disponibles",
+    key: "available",
+    dataIndex: "available",
   },
 ];
 
@@ -78,7 +77,10 @@ export default function HomePage() {
               title="Espacios Reservados"
               value={9}
               precision={0}
-              styles={{ content: { color: "#1890ff" }, title: { fontSize: 20 } }}
+              styles={{
+                content: { color: "#1890ff" },
+                title: { fontSize: 20 },
+              }}
             />
           </Card>
         </Col>
@@ -88,7 +90,10 @@ export default function HomePage() {
               title="Espacios Fuera de Servicio"
               value={9}
               precision={0}
-              styles={{ content: { color: "#fa8c16" }, title: { fontSize: 20 } }}
+              styles={{
+                content: { color: "#fa8c16" },
+                title: { fontSize: 20 },
+              }}
             />
           </Card>
         </Col>
@@ -97,12 +102,18 @@ export default function HomePage() {
       <Row gutter={16}>
         <Col span={18}>
           <Card title="Ocupación del Parqueo" variant="borderless">
-            <p>Aquí se mostraría gráfico lineal que mostraría ocupación mensual en porcentaje.</p>
+            <p>
+              Aquí se mostraría gráfico lineal que mostraría ocupación mensual
+              en porcentaje.
+            </p>
           </Card>
         </Col>
         <Col span={6}>
           <Card title="Ocupación por Piso" variant="borderless">
-            <p>Aquí se mostraría gráfico de barras que mostraría otras estadísticas relevantes del parqueo.</p>
+            <p>
+              Aquí se mostraría gráfico de barras que mostraría otras
+              estadísticas relevantes del parqueo.
+            </p>
           </Card>
         </Col>
       </Row>
