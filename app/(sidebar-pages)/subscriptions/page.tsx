@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { createUser, UserRole } from "@/app/lib/api/users";
 import { Card, Row, Col, Statistic, Form, message, Flex, Space, Button, Input, Select } from "antd";
 import {
   UserAddOutlined,
@@ -166,17 +167,29 @@ const SubscriptionsPage = () => {
     }
   };
 
-  const handleFormSubmit = async (values: Record<string, unknown>) => {
+const handleFormSubmit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
       const rawPlates = String(values.plateNumbers || "").toUpperCase().trim();
-      
+
       const startDate = editingSub ? editingSub.startDate : dayjs().toISOString();
       const endDate = editingSub ? editingSub.endDate : dayjs().add(1, "month").toISOString();
 
-      const payload = {
-        userId: Number(values.userId),
-        plateNumbers: rawPlates,
+      let targetUserId = values.userId ? Number(values.userId) : undefined;
+
+      if (!targetUserId) {
+        const createdUser = await createUser({
+          name: String(values.newUserName || "").trim(),
+          email: String(values.newUserEmail || "").trim(),
+          phone: String(values.newUserPhone || "").trim(),
+          role: "user" as UserRole,
+        });
+        targetUserId = Number(createdUser.id);
+      }
+
+const payload = {
+        userId: targetUserId,
+        plateNumbers: rawPlates, 
         rateId: Number(values.rateId),
         parkingSpaceId: values.parkingSpaceId ? Number(values.parkingSpaceId) : undefined,
         startDate,
@@ -189,10 +202,12 @@ const SubscriptionsPage = () => {
       } else {
         const response = await SubscriptionsService.create(payload);
         messageApi.success("Cliente Fijo, Espacio 24/7 y Placas LPR registrados con éxito.");
-        
-        // 🔍 Notificación avanzada de diagnóstico para el correo
+
         if (response && (response as unknown as { emailSent?: boolean }).emailSent === false) {
-          messageApi.warning("Aviso: La suscripción se creó, pero el correo electrónico con el QR NO pudo enviarse. Revisa la terminal del backend.", 7);
+          messageApi.warning(
+            "Aviso: La suscripción se creó, pero el correo electrónico con el QR NO pudo enviarse. Revisa la terminal del backend.",
+            7
+          );
         } else {
           messageApi.info("Correo con el código QR enviado correctamente al cliente.", 5);
         }
@@ -321,7 +336,7 @@ const SubscriptionsPage = () => {
         />
       </Card>
 
-      {/* Modales Modularizados */}
+      {/* Modales */}
       <SubscriptionModal
         open={isModalOpen}
         editingSub={editingSub}
