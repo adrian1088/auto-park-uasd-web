@@ -16,7 +16,8 @@ interface ParkingLot {
 interface ParkingFloor {
   id: number;
   floorNumber: number;
-  lotId: number;
+  name?: string;
+  lotId?: number;
 }
 
 interface SubscriptionModalProps {
@@ -44,9 +45,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 }) => {
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [floors, setFloors] = useState<ParkingFloor[]>([]);
-  
+  const [loadingFloors, setLoadingFloors] = useState<boolean>(false);
+
   const [selectedLotId, setSelectedLotId] = useState<number | undefined>(undefined);
   const [selectedFloorId, setSelectedFloorId] = useState<number | undefined>(undefined);
+  const [selectedExistingUserId, setSelectedExistingUserId] = useState<number | undefined>(undefined);
 
   const fetchLots = useCallback(async () => {
     try {
@@ -55,9 +58,14 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       });
       if (res.ok) {
         const result = await res.json();
+        const loadedLots = Array.isArray(result)
+          ? result
+          : result?.data || result?.items || [];
         startTransition(() => {
-          setLots(Array.isArray(result) ? result : result?.data || []);
+          setLots(loadedLots);
         });
+      } else {
+        console.warn("[SubscriptionModal] Error HTTP cargando lotes:", res.status);
       }
     } catch (error) {
       console.error("Error al cargar lotes:", error);
@@ -65,20 +73,28 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   }, []);
 
   const fetchFloors = useCallback(async (lotId: number): Promise<ParkingFloor[]> => {
+    setLoadingFloors(true);
     try {
       const res = await fetch(`http://localhost:3001/api/v1/parking/floors?lotId=${lotId}`, {
         credentials: "include",
       });
       if (res.ok) {
         const result = await res.json();
-        const loadedFloors = Array.isArray(result) ? result : result?.data || [];
+        const loadedFloors = Array.isArray(result)
+          ? result
+          : result?.data || result?.items || result?.floors || [];
+        console.log("[SubscriptionModal] Pisos para lotId", lotId, ":", loadedFloors);
         startTransition(() => {
           setFloors(loadedFloors);
         });
         return loadedFloors;
+      } else {
+        console.warn("[SubscriptionModal] Error HTTP cargando pisos:", res.status);
       }
     } catch (error) {
       console.error("Error al cargar pisos:", error);
+    } finally {
+      setLoadingFloors(false);
     }
     return [];
   }, []);
@@ -87,8 +103,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     if (isOpen) {
       void fetchLots().then(() => {
         if (editingSub) {
+          const existingUser = users.find((u) => Number(u.id) === Number(editingSub.userId));
+          setSelectedExistingUserId(editingSub.userId);
           form.setFieldsValue({
             userId: editingSub.userId,
+            newUserName: existingUser?.name || editingSub.user?.name || "",
+            newUserEmail: existingUser?.email || editingSub.user?.email || "",
+            newUserPhone: (existingUser as { phone?: string })?.phone || "",
             plateNumbers: editingSub.plateNumbers || "",
             rateId: editingSub.rateId,
             parkingSpaceId: editingSub.parkingSpaceId,
@@ -100,7 +121,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               const floorId = currentSpace.floor.id;
               const floorObj = currentSpace.floor as { lotId?: number; lot?: { id?: number } };
               const lotId = floorObj.lotId || floorObj.lot?.id;
-              
+
               if (lotId) {
                 setSelectedLotId(lotId);
                 void fetchFloors(lotId).then(() => {
@@ -112,7 +133,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             }
           }
         } else {
+          setSelectedExistingUserId(undefined);
           form.setFieldsValue({
+            userId: undefined,
+            newUserName: undefined,
+            newUserEmail: undefined,
+            newUserPhone: undefined,
             startDate: dayjs(),
             endDate: dayjs().add(1, "month"),
           });
@@ -124,15 +150,37 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     }
   };
 
-  const handleLotChange = (lotId: number) => {
+  const handleUserSelect = (userId?: number) => {
+    setSelectedExistingUserId(userId);
+    if (userId) {
+      const found = users.find((u) => Number(u.id) === Number(userId));
+      if (found) {
+        form.setFieldsValue({
+          newUserName: found.name,
+          newUserEmail: found.email,
+          newUserPhone: (found as { phone?: string }).phone || "",
+        });
+      }
+    } else {
+      form.setFieldsValue({
+        newUserName: undefined,
+        newUserEmail: undefined,
+        newUserPhone: undefined,
+      });
+    }
+  };
+
+  const handleLotChange = (lotId?: number) => {
     setSelectedLotId(lotId);
     setSelectedFloorId(undefined);
     form.setFieldValue("parkingSpaceId", undefined);
     setFloors([]);
-    void fetchFloors(lotId);
+    if (lotId) {
+      void fetchFloors(lotId);
+    }
   };
 
-  const handleFloorChange = (floorId: number) => {
+  const handleFloorChange = (floorId?: number) => {
     setSelectedFloorId(floorId);
     form.setFieldValue("parkingSpaceId", undefined);
   };
@@ -141,10 +189,20 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     const status = String(s.status || "").trim().toUpperCase();
     const isFree = status === "FREE";
     const isCurrentAssigned = editingSub && Number(s.id) === Number(editingSub.parkingSpaceId);
-    const matchesFloor = selectedFloorId ? Number(s.floor?.id) === Number(selectedFloorId) : true;
-    
+    const spaceFloorId = s.floor?.id ?? (s as { floorId?: number }).floorId;
+    const matchesFloor = selectedFloorId ? Number(spaceFloorId) === Number(selectedFloorId) : true;
+
     return (isFree || isCurrentAssigned) && matchesFloor;
   });
+
+  const handleFinish = async (values: Record<string, unknown>) => {
+    await onSubmit({
+      ...values,
+      userMode: values.userId ? "existing" : "new",
+    });
+  };
+
+  const isExistingSelected = Boolean(selectedExistingUserId || editingSub);
 
   return (
     <Modal
@@ -156,18 +214,71 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       width={600}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" onFinish={onSubmit} style={{ marginTop: 16 }}>
-        <Form.Item name="userId" label="Cliente / Usuario" rules={[{ required: true, message: "Selecciona el cliente" }]}>
+      <Form form={form} layout="vertical" onFinish={handleFinish} style={{ marginTop: 16 }}>
+        <Form.Item
+          name="userId"
+          label="Buscar Usuario Existente (Opcional)"
+          tooltip="Si el cliente ya está registrado en el sistema, búscalo aquí para autocompletar sus datos."
+        >
           <Select
             showSearch
-            placeholder="Buscar cliente por nombre o correo"
-            optionFilterProp="children"
+            allowClear
+            disabled={Boolean(editingSub)}
+            placeholder="Filtrar por nombre o correo (dejar vacío para crear nuevo)..."
+            optionFilterProp="label"
+            onChange={handleUserSelect}
+            filterOption={(input, option) =>
+              String(option?.label ?? "")
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
             options={users.map((u) => ({
               label: `${u.name} (${u.email})`,
               value: u.id,
             }))}
           />
         </Form.Item>
+
+        <Row gutter={12}>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="newUserName"
+              label="Nombre Completo"
+              rules={[{ required: !isExistingSelected, message: "Ingresa el nombre del usuario" }]}
+            >
+              <Input placeholder="Ej. Juan Pérez" disabled={isExistingSelected} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="newUserEmail"
+              label="Correo Electrónico"
+              rules={[
+                { required: !isExistingSelected, message: "Ingresa el correo" },
+                { type: "email", message: "Correo inválido" },
+              ]}
+            >
+              <Input placeholder="correo@ejemplo.com" disabled={isExistingSelected} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        {!isExistingSelected && (
+          <Form.Item
+            name="newUserPhone"
+            label="Teléfono"
+            rules={[
+              { required: true, message: "Ingresa el teléfono" },
+              {
+                min: 10,
+                max: 15,
+                message: "El teléfono debe tener entre 10 y 15 caracteres",
+              },
+            ]}
+          >
+            <Input placeholder="Ej. 8095551234" />
+          </Form.Item>
+        )}
 
         <Form.Item
           name="plateNumbers"
@@ -203,11 +314,15 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <Col xs={24} sm={12}>
             <Form.Item label="Tipo de Piso / Nivel">
               <Select
-                placeholder="Seleccionar piso"
+                placeholder={!selectedLotId ? "Primero selecciona un lugar" : "Seleccionar piso"}
                 value={selectedFloorId}
+                loading={loadingFloors}
                 onChange={handleFloorChange}
-                options={floors.map((f) => ({ label: `Piso ${f.floorNumber}`, value: f.id }))}
-                disabled={!selectedLotId || floors.length === 0}
+                options={floors.map((f) => ({
+                  label: f.name ? `${f.name} (Piso ${f.floorNumber})` : `Piso ${f.floorNumber}`,
+                  value: f.id,
+                }))}
+                disabled={!selectedLotId}
                 allowClear
               />
             </Form.Item>
@@ -223,10 +338,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <Select
             showSearch
             placeholder={selectedFloorId ? "Seleccionar espacio disponible" : "Primero selecciona un lugar y piso"}
-            optionFilterProp="children"
+            optionFilterProp="label"
             disabled={!selectedFloorId}
             options={filteredSpaces.map((s) => ({
-              label: `Espacio #${s.spaceNumber} (${s.status}) - Piso ${s.floor?.floorNumber || 1}`,
+              label: `Espacio ${s.spaceNumber}- Piso ${s.floor?.floorNumber || 1}`,
               value: s.id,
             }))}
           />
