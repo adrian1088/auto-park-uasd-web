@@ -2,7 +2,19 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createUser, UserRole } from "@/app/lib/api/users";
-import { Card, Row, Col, Statistic, Form, message, Flex, Space, Button, Input, Select } from "antd";
+import {
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Form,
+  message,
+  Flex,
+  Space,
+  Button,
+  Input,
+  Select,
+} from "antd";
 import {
   UserAddOutlined,
   UsergroupAddOutlined,
@@ -16,7 +28,10 @@ import dayjs from "dayjs";
 import HeaderPage from "@/app/components/HeaderPage";
 import { ReservationsService, User } from "@/app/lib/api/reservations";
 import { getRates, Rate } from "@/app/lib/api/rates";
-import { SubscriptionsService, Subscription } from "@/app/lib/api/subscriptions";
+import {
+  SubscriptionsService,
+  Subscription,
+} from "@/app/lib/api/subscriptions";
 import { getParkingSpaces, ParkingSpace } from "@/app/lib/api/spaces";
 import { getPaymentsPaginated, Payment } from "@/app/lib/api/payments";
 
@@ -38,7 +53,8 @@ const SubscriptionsPage = () => {
   const [renewingSub, setRenewingSub] = useState<Subscription | null>(null);
 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
-  const [selectedSubForHistory, setSelectedSubForHistory] = useState<Subscription | null>(null);
+  const [selectedSubForHistory, setSelectedSubForHistory] =
+    useState<Subscription | null>(null);
   const [clientPayments, setClientPayments] = useState<Payment[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
 
@@ -113,7 +129,6 @@ const SubscriptionsPage = () => {
     setIsRenewModalOpen(true);
   };
 
-
   const openHistoryModal = async (record: Subscription) => {
     setSelectedSubForHistory(record);
     setIsHistoryModalOpen(true);
@@ -122,10 +137,15 @@ const SubscriptionsPage = () => {
       // Solicitamos los pagos recientes de caja
       const response = await getPaymentsPaginated({ page: 1, limit: 100 });
       let allPayments: Payment[] = [];
-      
+
       if (Array.isArray(response)) {
         allPayments = response;
-      } else if (response && typeof response === "object" && "data" in response && Array.isArray((response as { data: Payment[] }).data)) {
+      } else if (
+        response &&
+        typeof response === "object" &&
+        "data" in response &&
+        Array.isArray((response as { data: Payment[] }).data)
+      ) {
         allPayments = (response as { data: Payment[] }).data;
       }
 
@@ -139,12 +159,21 @@ const SubscriptionsPage = () => {
     }
   };
 
-  const handleConfirmRenewal = async (values: { amount: number; paymentMethod: string }) => {
+  const handleConfirmRenewal = async (values: {
+    amount: number;
+    paymentMethod: string;
+  }) => {
     if (!renewingSub) return;
     setSubmitting(true);
     try {
-      await SubscriptionsService.renew(renewingSub.id, Number(values.amount), values.paymentMethod);
-      messageApi.success(`¡Pago de RD$ ${Number(values.amount).toFixed(2)} registrado en caja y suscripción renovada!`);
+      await SubscriptionsService.renew(
+        renewingSub.id,
+        Number(values.amount),
+        values.paymentMethod,
+      );
+      messageApi.success(
+        `¡Pago de RD$ ${Number(values.amount).toFixed(2)} registrado en caja y suscripción renovada!`,
+      );
       setIsRenewModalOpen(false);
       setRenewingSub(null);
       void fetchData();
@@ -159,21 +188,31 @@ const SubscriptionsPage = () => {
   const handleTogglePause = async (record: Subscription) => {
     try {
       const newStatus = record.status === "PAUSED" ? "ACTIVE" : "PAUSED";
-      await SubscriptionsService.update(record.id, { status: newStatus } as unknown as { status: "ACTIVE" | "EXPIRED" | "PAUSED" });
-      messageApi.success(`Suscripción ${newStatus === "PAUSED" ? "pausada" : "reactivada"} en el servidor.`);
+      await SubscriptionsService.update(record.id, {
+        status: newStatus,
+      } as unknown as { status: "ACTIVE" | "EXPIRED" | "PAUSED" });
+      messageApi.success(
+        `Suscripción ${newStatus === "PAUSED" ? "pausada" : "reactivada"} en el servidor.`,
+      );
       void fetchData();
     } catch {
       messageApi.error("No se pudo cambiar el estado de la suscripción.");
     }
   };
 
-const handleFormSubmit = async (values: Record<string, unknown>) => {
+  const handleFormSubmit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
-      const rawPlates = String(values.plateNumbers || "").toUpperCase().trim();
+      const rawPlates = String(values.plateNumbers || "")
+        .toUpperCase()
+        .trim();
 
-      const startDate = editingSub ? editingSub.startDate : dayjs().toISOString();
-      const endDate = editingSub ? editingSub.endDate : dayjs().add(1, "month").toISOString();
+      const startDate = editingSub
+        ? editingSub.startDate
+        : dayjs().toISOString();
+      const endDate = editingSub
+        ? editingSub.endDate
+        : dayjs().add(1, "month").toISOString();
 
       let targetUserId = values.userId ? Number(values.userId) : undefined;
 
@@ -187,29 +226,41 @@ const handleFormSubmit = async (values: Record<string, unknown>) => {
         targetUserId = Number(createdUser.id);
       }
 
-const payload = {
+      const payload = {
         userId: targetUserId,
-        plateNumbers: rawPlates, 
+        plateNumbers: rawPlates,
         rateId: Number(values.rateId),
-        parkingSpaceId: values.parkingSpaceId ? Number(values.parkingSpaceId) : undefined,
+        parkingSpaceId: values.parkingSpaceId
+          ? Number(values.parkingSpaceId)
+          : undefined,
         startDate,
         endDate,
       };
 
       if (editingSub) {
         await SubscriptionsService.update(editingSub.id, payload);
-        messageApi.success("Cliente Fijo y Espacio 24/7 actualizados correctamente.");
+        messageApi.success(
+          "Cliente Fijo y Espacio 24/7 actualizados correctamente.",
+        );
       } else {
         const response = await SubscriptionsService.create(payload);
-        messageApi.success("Cliente Fijo, Espacio 24/7 y Placas LPR registrados con éxito.");
+        messageApi.success(
+          "Cliente Fijo, Espacio 24/7 y Placas LPR registrados con éxito.",
+        );
 
-        if (response && (response as unknown as { emailSent?: boolean }).emailSent === false) {
+        if (
+          response &&
+          (response as unknown as { emailSent?: boolean }).emailSent === false
+        ) {
           messageApi.warning(
             "Aviso: La suscripción se creó, pero el correo electrónico con el QR NO pudo enviarse. Revisa la terminal del backend.",
-            7
+            7,
           );
         } else {
-          messageApi.info("Correo con el código QR enviado correctamente al cliente.", 5);
+          messageApi.info(
+            "Correo con el código QR enviado correctamente al cliente.",
+            5,
+          );
         }
       }
 
@@ -237,17 +288,30 @@ const payload = {
   const filteredSubscriptions = subscriptions.filter((item) => {
     const matchesSearch =
       item.user?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      (item.plateNumbers || "").toLowerCase().includes(searchText.toLowerCase());
+      (item.plateNumbers || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase());
 
-    const isExpired = item.status === "EXPIRED" || dayjs().isAfter(dayjs(item.endDate));
-    const currentStatus = isExpired && item.status !== "PAUSED" ? "EXPIRED" : item.status;
+    const isExpired =
+      item.status === "EXPIRED" || dayjs().isAfter(dayjs(item.endDate));
+    const currentStatus =
+      isExpired && item.status !== "PAUSED" ? "EXPIRED" : item.status;
 
-    return matchesSearch && (statusFilter === "ALL" || currentStatus === statusFilter);
+    return (
+      matchesSearch &&
+      (statusFilter === "ALL" || currentStatus === statusFilter)
+    );
   });
 
   const totalCount = subscriptions.length;
-  const activeCount = subscriptions.filter((s) => !dayjs().isAfter(dayjs(s.endDate)) && s.status === "ACTIVE").length;
-  const expiredCount = subscriptions.filter((s) => (dayjs().isAfter(dayjs(s.endDate)) || s.status === "EXPIRED") && s.status !== "PAUSED").length;
+  const activeCount = subscriptions.filter(
+    (s) => !dayjs().isAfter(dayjs(s.endDate)) && s.status === "ACTIVE",
+  ).length;
+  const expiredCount = subscriptions.filter(
+    (s) =>
+      (dayjs().isAfter(dayjs(s.endDate)) || s.status === "EXPIRED") &&
+      s.status !== "PAUSED",
+  ).length;
   const pausedCount = subscriptions.filter((s) => s.status === "PAUSED").length;
 
   return (
@@ -264,7 +328,11 @@ const payload = {
             <Button icon={<ReloadOutlined />} onClick={fetchData}>
               Actualizar
             </Button>
-            <Button type="primary" icon={<UserAddOutlined />} onClick={openCreateModal}>
+            <Button
+              type="primary"
+              icon={<UserAddOutlined />}
+              onClick={openCreateModal}
+            >
               Nuevo Cliente Fijo
             </Button>
           </Space>
@@ -275,22 +343,41 @@ const payload = {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={6}>
           <Card variant="borderless">
-            <Statistic title="Total Abonados" value={totalCount} prefix={<UsergroupAddOutlined />} />
+            <Statistic
+              title="Total Abonados"
+              value={totalCount}
+              prefix={<UsergroupAddOutlined />}
+            />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card variant="borderless">
-            <Statistic title="Activas (LPR OK)" value={activeCount} styles={{ content: { color: "#52c41a" } }} prefix={<CheckCircleOutlined />} />
+            <Statistic
+              title="Activas (LPR OK)"
+              value={activeCount}
+              styles={{ content: { color: "#52c41a" } }}
+              prefix={<CheckCircleOutlined />}
+            />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card variant="borderless">
-            <Statistic title="Vencidas / Pendientes" value={expiredCount} styles={{ content: { color: "#ff4d4f" } }} prefix={<ClockCircleOutlined />} />
+            <Statistic
+              title="Vencidas / Pendientes"
+              value={expiredCount}
+              styles={{ content: { color: "#ff4d4f" } }}
+              prefix={<ClockCircleOutlined />}
+            />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card variant="borderless">
-            <Statistic title="Pausadas" value={pausedCount} styles={{ content: { color: "#fa8c16" } }} prefix={<PauseCircleOutlined />} />
+            <Statistic
+              title="Pausadas"
+              value={pausedCount}
+              styles={{ content: { color: "#fa8c16" } }}
+              prefix={<PauseCircleOutlined />}
+            />
           </Card>
         </Col>
       </Row>
