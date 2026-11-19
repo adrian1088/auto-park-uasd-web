@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, startTransition } from "react";
 import { Modal, Form, Select, Input, Space, Button, FormInstance, Alert, Row, Col } from "antd";
-import { User } from "@/app/lib/api/reservations";
+import type { User } from "@/app/lib/api/users";
 import { Rate } from "@/app/lib/api/rates";
 import { ParkingSpace } from "@/app/lib/api/spaces";
 import { Subscription } from "@/app/lib/api/subscriptions";

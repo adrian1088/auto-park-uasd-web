@@ -4,8 +4,6 @@ import Descriptions from "@/app/components/Descriptions";
 import type { CurrentUser } from "@/app/components/layout/HeaderUserSection";
 import type { ParkingLot } from "@/app/lib/api/lots";
 import { getParkingLots } from "@/app/lib/api/lots";
-import type { Reservation } from "@/app/lib/api/reservations";
-import { getReservations } from "@/app/lib/api/reservations";
 import { getCurrentUser } from "@/app/lib/api/auth";
 import { checkInTicket } from "@/app/lib/api/tickets";
 import type { CheckInInput, Ticket } from "@/app/lib/api/tickets";
@@ -54,7 +52,6 @@ const CheckInPage = () => {
   const [entryType, setEntryType] = useState<EntryType>("SIN_RESERVACION");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [parkingLots, setParkingLots] = useState<ParkingLot[]>([]);
-  const [currentReservations, setCurrentReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -72,31 +69,17 @@ const CheckInPage = () => {
       setOptionsLoading(true);
       setOptionsError(null);
       try {
-        if (entryType === "SIN_RESERVACION") {
-          const [user, vehicleList, lotList] = await Promise.all([
-            getCurrentUser(),
-            getVehicles(),
-            getParkingLots(),
-          ]);
-          if (!active) return;
-          setCurrentUser(user);
-          setVehicles(
-            vehicleList.filter((vehicle) => vehicle.user?.id === user.id),
-          );
-          setParkingLots(lotList);
-        } else {
-          const reservationList = await getReservations();
-          if (!active) return;
-          const now = Date.now();
-          setCurrentReservations(
-            reservationList.filter(
-              (reservation) =>
-                reservation.vehicle &&
-                new Date(reservation.startTime).getTime() <= now &&
-                new Date(reservation.endTime).getTime() > now,
-            ),
-          );
-        }
+        const [user, vehicleList, lotList] = await Promise.all([
+          getCurrentUser(),
+          getVehicles(),
+          getParkingLots(),
+        ]);
+        if (!active) return;
+        setCurrentUser(user);
+        setVehicles(
+          vehicleList.filter((vehicle) => vehicle.user?.id === user.id),
+        );
+        setParkingLots(lotList);
       } catch (error) {
         if (active) setOptionsError(getErrorMessage(error));
       } finally {
@@ -108,7 +91,7 @@ const CheckInPage = () => {
     return () => {
       active = false;
     };
-  }, [entryType, optionsReload]);
+  }, [optionsReload]);
 
   const handleSubmit = async (fields: CheckInFields) => {
     setActionError(null);
@@ -154,9 +137,7 @@ const CheckInPage = () => {
   const canSubmit =
     !optionsLoading &&
     !optionsError &&
-    (entryType === "SIN_RESERVACION"
-      ? Boolean(currentUser && vehicles.length && parkingLots.length)
-      : currentReservations.length > 0);
+    Boolean(currentUser && vehicles.length && parkingLots.length);
 
   return (
     <Flex
@@ -183,7 +164,11 @@ const CheckInPage = () => {
             size="large"
             options={[
               { label: "Sin reservación", value: "SIN_RESERVACION" },
-              { label: "Con reservación", value: "CON_RESERVACION" },
+              {
+                label: "Con reservación (no disponible)",
+                value: "CON_RESERVACION",
+                disabled: true,
+              },
             ]}
           />
 
@@ -256,27 +241,7 @@ const CheckInPage = () => {
                     />
                   </Form.Item>
                 </>
-              ) : (
-                <Form.Item
-                  label="Reservación vigente"
-                  name="reservationId"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Selecciona una reservación vigente.",
-                    },
-                  ]}
-                >
-                  <Select
-                    size="large"
-                    placeholder="Selecciona por ID de reservación"
-                    options={currentReservations.map((reservation) => ({
-                      value: reservation.id,
-                      label: `#${reservation.id} — ${reservation.vehicle?.plateNumber ?? "Sin placa"} — hasta ${formatDateTime(reservation.endTime)}`,
-                    }))}
-                  />
-                </Form.Item>
-              )}
+              ) : null}
 
               {!optionsLoading &&
                 !optionsError &&
@@ -290,18 +255,6 @@ const CheckInPage = () => {
                         ? "No hay vehículos asociados a tu cuenta."
                         : "No hay estacionamientos disponibles."
                     }
-                    style={{ marginBottom: 16 }}
-                  />
-                )}
-
-              {!optionsLoading &&
-                !optionsError &&
-                entryType === "CON_RESERVACION" &&
-                currentReservations.length === 0 && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    title="No hay reservaciones vigentes con vehículo asignado."
                     style={{ marginBottom: 16 }}
                   />
                 )}

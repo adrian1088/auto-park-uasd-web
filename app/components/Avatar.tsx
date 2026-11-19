@@ -5,12 +5,13 @@ type AvatarProps = {
   src?: string;
   alt?: string;
   size?: number | 'small' | 'default' | 'large';
+  maxInitials?: number;
 };
 
-const getInitials = (fullName: string) => {
+const getInitials = (fullName: string, maxInitials = 2) => {
   const names = fullName.split(' ');
   const initials = names.map((name) => name.charAt(0).toUpperCase());
-  return initials.join('');
+  return initials.slice(0, maxInitials).join('');
 };
 
 const getDeterministicColor = (input: string) => {
@@ -24,9 +25,9 @@ const getDeterministicColor = (input: string) => {
   return `hsl(${hue}, 65%, 45%)`;
 };
 
-const Avatar = ({ fullName, src, alt, size }: AvatarProps) => {
+const Avatar = ({ fullName, src, alt, size, maxInitials = 2 }: AvatarProps) => {
   if (fullName && !src) {
-    const initials = getInitials(fullName);
+    const initials = getInitials(fullName, maxInitials);
     return (
       <Flex
         align="center"

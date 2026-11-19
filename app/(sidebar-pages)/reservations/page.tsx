@@ -1,211 +1,163 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Button, Space, Modal, Card, Row, Col, Typography, Input, Select, message, Form } from "antd";
-import { PlusOutlined, SearchOutlined, ReloadOutlined } from "@ant-design/icons";
+import HeaderPage from "@/app/components/HeaderPage";
+import {
+  createReservation,
+  type ReservationFields,
+} from "@/app/lib/api/reservations";
+import {
+  getParkingSpaces,
+  type ParkingSpace,
+} from "@/app/lib/api/spaces";
+import { HttpError } from "@/app/lib/http";
+import { Button, Card, Flex, Form, message } from "antd";
 import dayjs from "dayjs";
-import { ReservationsService, Reservation, User } from "@/app/lib/api/reservations";
-import { ReservationKPIs } from "./components/ReservationKPIs";
-import { ReservationTable } from "./components/ReservationTable";
+import { useEffect, useState } from "react";
 import { ReservationModalForm } from "./components/ReservationModalForm";
+import { ReservationTable } from "./components/ReservationTable";
 
-const { Title, Paragraph } = Typography;
-
-export default function ReservationsPage() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [searchText, setSearchText] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
-  const [isSubmitLoading, setIsSubmitLoading] = useState<boolean>(false);
-
-  const [users, setUsers] = useState<User[]>([]);
-
-  const [form] = Form.useForm();
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [reservationsData, usersData] = await Promise.all([
-        ReservationsService.getAll(),
-        ReservationsService.getUsers(),
-      ]);
-      setReservations(reservationsData);
-      setUsers(usersData);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string | string[] } } };
-      const errMsg = error.response?.data?.message || "Error al cargar los datos";
-      message.error(Array.isArray(errMsg) ? errMsg.join(", ") : errMsg);
-    } finally {
-      setLoading(false);
+function getErrorMessage(error: unknown) {
+  if (error instanceof HttpError) {
+    const body = error.body;
+    if (body && typeof body === "object" && "message" in body) {
+      const detail = body.message;
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) return detail.join(", ");
     }
-  }, []);
+  }
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error inesperado.";
+}
 
-// Carga inicial al montar el componente
-  React.useEffect(() => {
-    let isMounted = true;
-    queueMicrotask(() => {
-      if (isMounted) {
-        void fetchData();
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchData]);
-  
+type ReservationFormValues = {
+  startTime: dayjs.Dayjs;
+  endTime: dayjs.Dayjs;
+  parkingSpaceId: number;
+  vehiclePlateNumber?: string;
+};
 
-const handleCreateReservation = async (values: {
-    entryTime: dayjs.Dayjs;
-    userId: number;
-  }) => {
-    setIsSubmitLoading(true);
-    try {
-      const entryTime = values.entryTime;
-      const endTime = dayjs(entryTime).add(2, "hour");
+function getReservationFields(values: ReservationFormValues): ReservationFields {
+  if (!dayjs.isDayjs(values.startTime)) {
+    throw new Error("La fecha de inicio es obligatoria.");
+  }
+  if (!dayjs.isDayjs(values.endTime)) {
+    throw new Error("La fecha de fin es obligatoria.");
+  }
+  if (!values.endTime.isAfter(values.startTime)) {
+    throw new Error("La fecha de fin debe ser posterior a la fecha de inicio.");
+  }
+  if (!Number.isInteger(values.parkingSpaceId) || values.parkingSpaceId < 1) {
+    throw new Error("El espacio es obligatorio.");
+  }
 
-      const payload = {
-        startTime: entryTime.toISOString(),
-        endTime: endTime.toISOString(),
-        userId: values.userId,
-      };
-
-      await ReservationsService.createConfirmed(payload);
-      message.success("¡Reserva creada con éxito! Se ha enviado el código QR al correo del cliente.");
-      setIsCreateModalOpen(false);
-      form.resetFields();
-      void fetchData();
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string | string[] } } };
-      const errMsg = error.response?.data?.message || "No se pudo registrar la reservación";
-      message.error(Array.isArray(errMsg) ? errMsg.join(", ") : errMsg);
-    } finally {
-      setIsSubmitLoading(false);
-    }
+  const plate = values.vehiclePlateNumber?.trim();
+  return {
+    startTime: values.startTime.toISOString(),
+    endTime: values.endTime.toISOString(),
+    parkingSpaceId: values.parkingSpaceId,
+    ...(plate ? { vehiclePlateNumber: plate } : {}),
   };
+}
 
-  const handleCancelReservation = async (id: number) => {
-    Modal.confirm({
-      title: "¿Deseas cancelar esta reservación?",
-      content: "El cupo lógico será liberado de inmediato.",
-      okText: "Sí, cancelar",
-      okType: "danger",
-      cancelText: "No",
-      onOk: async () => {
-        try {
-          await ReservationsService.remove(id);
-          message.success("Reservación cancelada correctamente");
-          void fetchData();
-        } catch {
-          message.error("No se pudo cancelar la reserva");
+const ReservationsPage = () => {
+  const [form] = Form.useForm<ReservationFormValues>();
+  const [spaces, setSpaces] = useState<ParkingSpace[]>([]);
+  const [spacesLoading, setSpacesLoading] = useState(false);
+  const [spacesReload, setSpacesReload] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSpaces = async () => {
+      setSpacesLoading(true);
+      try {
+        const data = await getParkingSpaces();
+        if (active) setSpaces(data);
+      } catch (error) {
+        if (active) {
+          messageApi.error(
+            `No se pudieron cargar los espacios: ${getErrorMessage(error)}`,
+          );
         }
-      },
-    });
+      } finally {
+        if (active) setSpacesLoading(false);
+      }
+    };
+
+    void loadSpaces();
+    return () => {
+      active = false;
+    };
+  }, [messageApi, spacesReload]);
+
+  const openCreateModal = () => {
+    form.resetFields();
+    setModalOpen(true);
   };
 
-  const filteredReservations = reservations.filter((item) => {
-    const matchesSearch =
-      item.user?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.id.toString().includes(searchText);
+  const closeModal = () => {
+    if (saving) return;
+    setModalOpen(false);
+    form.resetFields();
+  };
 
-    const currentStatus = item.status || "CONFIRMED";
-    const isExpired =
-      currentStatus === "CONFIRMED" &&
-      dayjs().isAfter(dayjs(item.startTime).add(20, "minute"));
-
-    const finalStatus = isExpired ? "NO_SHOW" : currentStatus;
-    return matchesSearch && (statusFilter === "ALL" || finalStatus === statusFilter);
-  });
-
-  const totalCount = reservations.length;
-  const confirmedCount = reservations.filter(
-    (r) =>
-      (r.status || "CONFIRMED") === "CONFIRMED" &&
-      !dayjs().isAfter(dayjs(r.startTime).add(20, "minute")),
-  ).length;
-  const completedCount = reservations.filter((r) => r.status === "COMPLETED").length;
-  const cancelledCount = reservations.filter(
-    (r) =>
-      r.status === "CANCELLED" ||
-      r.status === "NO_SHOW" ||
-      ((r.status || "CONFIRMED") === "CONFIRMED" &&
-        dayjs().isAfter(dayjs(r.startTime).add(20, "minute"))),
-  ).length;
+  const handleSubmit = async (values: ReservationFormValues) => {
+    setSaving(true);
+    try {
+      await createReservation(getReservationFields(values));
+      messageApi.success("Reservación creada correctamente.");
+      setModalOpen(false);
+      form.resetFields();
+      setReloadKey((key) => key + 1);
+      setSpacesReload((key) => key + 1);
+    } catch (error) {
+      messageApi.error(
+        `No se pudo crear la reservación: ${getErrorMessage(error)}`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div style={{ padding: "4px" }}>
-      {/* Encabezado */}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
-        <Col>
-          <Title level={3} style={{ margin: 0 }}>Reservaciones</Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Gestión administrativa de reservaciones presenciales y confirmadas.
-          </Paragraph>
-        </Col>
-        <Col>
-          <Space>
-            <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>Actualizar</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalOpen(true)}>
-              Nueva Reserva
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-
-      {/* Tarjetas KPI */}
-      <ReservationKPIs
-        totalCount={totalCount}
-        confirmedCount={confirmedCount}
-        completedCount={completedCount}
-        cancelledCount={cancelledCount}
+    <Flex vertical gap={16}>
+      {contextHolder}
+      <HeaderPage
+        title="Reservaciones"
+        description="Gestionar las reservaciones registradas en el sistema."
       />
 
-      {/* Filtros */}
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16} align="middle">
-          <Col xs={24} sm={12} md={8}>
-            <Input
-              placeholder="Buscar por usuario o código..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Select
-              style={{ width: "100%" }}
-              value={statusFilter}
-              onChange={(val) => setStatusFilter(val)}
-              options={[
-                { label: "Todos los Estados", value: "ALL" },
-                { label: "Confirmadas (Por Llegar)", value: "CONFIRMED" },
-                { label: "En Parqueo (COMPLETED)", value: "COMPLETED" },
-                { label: "Canceladas / No Se Presentó", value: "CANCELLED" },
-                { label: "Tolerancia Vencida (NO_SHOW)", value: "NO_SHOW" },
-              ]}
-            />
-          </Col>
-        </Row>
+      <Card
+        title="Todas las reservaciones"
+        styles={{ body: { padding: 0 } }}
+        extra={
+          <Button
+            type="primary"
+            onClick={openCreateModal}
+            loading={spacesLoading}
+          >
+            Nueva reservación
+          </Button>
+        }
+      >
+        <ReservationTable reloadKey={reloadKey} />
       </Card>
 
-      {/* Tabla de Resultados */}
-      <ReservationTable
-        data={filteredReservations}
-        loading={loading}
-        onCancel={(id) => void handleCancelReservation(id)}
-      />
-
-      {/* Formulario Modal */}
       <ReservationModalForm
-        open={isCreateModalOpen}
-        onCancel={() => setIsCreateModalOpen(false)}
-        onFinish={(values) => void handleCreateReservation(values)}
-        loading={isSubmitLoading}
+        open={modalOpen}
+        onCancel={closeModal}
+        onFinish={handleSubmit}
+        loading={saving}
         form={form}
-        users={users}
+        spaces={spaces}
       />
-    </div>
+    </Flex>
   );
-}
+};
+
+export default ReservationsPage;

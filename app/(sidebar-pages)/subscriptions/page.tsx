@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import HeaderPage from "@/app/components/HeaderPage";
-import { ReservationsService, User } from "@/app/lib/api/reservations";
+import { getUsersPaginated, type User } from "@/app/lib/api/users";
 import { getRates, Rate } from "@/app/lib/api/rates";
 import {
   SubscriptionsService,
@@ -72,12 +72,12 @@ const SubscriptionsPage = () => {
     setLoading(true);
     try {
       const [usersData, ratesData, spacesData, subsData] = await Promise.all([
-        ReservationsService.getUsers(),
+        getUsersPaginated({ page: 1, limit: 100 }),
         getRates({ type: "MONTHLY" }),
         getParkingSpaces(),
         SubscriptionsService.findAll(),
       ]);
-      setUsers(usersData);
+      setUsers(usersData.data);
       setRates(ratesData);
       setSpaces(spacesData || []);
       setSubscriptions(subsData || []);
