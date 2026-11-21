@@ -9,6 +9,7 @@ import { useState } from "react";
 import { getErrorMessage } from "@/app/lib/utils";
 import { activateEmail } from "@/app/lib/api/auth";
 import FormConfirmEmail from "./components/FormConfirmEmail";
+import { AppLogo } from "@/app/components/AppLogo";
 
 const { Title, Text } = Typography;
 
@@ -37,9 +38,13 @@ const ActivateEmailPasswordPage = () => {
         token: hashParam ?? "",
         password: fields.password,
       });
-      messageApi.success("Correo electrónico activado exitosamente.", 10, () => {
-        router.push("/sign-in");
-      });
+      messageApi.success(
+        "Correo electrónico activado exitosamente.",
+        10,
+        () => {
+          router.push("/sign-in");
+        },
+      );
     } catch (error: any) {
       messageApi.error(
         `No se pudo activar el correo electrónico: ${getErrorMessage(error)}`,
@@ -60,18 +65,7 @@ const ActivateEmailPasswordPage = () => {
       }}
       vertical
     >
-      <Image
-        src="/images/logo.png"
-        alt="Auto Park UASD"
-        width={855}
-        height={247}
-        style={{
-          width: "100%",
-          maxWidth: 300,
-          height: "auto",
-          marginBottom: 44,
-        }}
-      />
+      <AppLogo />
       <Title level={4}>Activar Correo Electrónico</Title>
       <Text style={{ textAlign: "center" }} type="secondary">
         Por favor click en el botón para activar su correo electrónico, y

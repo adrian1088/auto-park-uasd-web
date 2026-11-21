@@ -9,12 +9,13 @@ import {
   Typography,
   message,
 } from "antd";
-import Image from "next/image";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/app/lib/api/auth";
-import { http, HttpError } from "@/app/lib/http";
+import { http } from "@/app/lib/http";
+import { AppLogo } from "@/app/components/AppLogo";
+import { getErrorMessage } from "@/app/lib/utils";
 
 const { Title, Paragraph, Text, Link } = Typography;
 
@@ -47,10 +48,11 @@ const SignInPage = () => {
         next && next.startsWith("/") && !next.startsWith("//") ? next : "/",
       );
     } catch (error) {
+      const errorMsg = getErrorMessage(error);
       setErrorMessage(
-        error instanceof HttpError && error.status === 401
+        !errorMsg
           ? "Credenciales inválidas. Verifica tu usuario/correo y contraseña."
-          : "No se pudo iniciar sesión",
+          : `No se pudo iniciar sesión: ${errorMsg}`,
       );
     } finally {
       setSubmitting(false);
@@ -69,18 +71,7 @@ const SignInPage = () => {
       }}
       vertical
     >
-      <Image
-        src="/images/logo.png"
-        alt="Auto Park UASD"
-        width={855}
-        height={247}
-        style={{
-          width: "100%",
-          maxWidth: 300,
-          height: "auto",
-          marginBottom: 44,
-        }}
-      />
+      <AppLogo />
       <Title level={4}>Iniciar Sesión</Title>
       <Paragraph style={{ textAlign: "center" }} type="secondary">
         Usa tu nombre de usuario o dirección de correo electrónico para ingresar
@@ -130,7 +121,6 @@ const SignInPage = () => {
             prefix={<LockOutlined />}
             placeholder="Contraseña"
             autoComplete="current-password"
-
           />
         </Form.Item>
         <Form.Item>

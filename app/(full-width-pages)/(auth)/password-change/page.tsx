@@ -9,12 +9,13 @@ import Image from "next/image";
 import { Typography } from "antd";
 import { RollbackOutlined } from "@ant-design/icons";
 import { getErrorMessage } from "@/app/lib/utils";
+import { AppLogo } from "@/app/components/AppLogo";
 
 const { Title, Text } = Typography;
 
 function getConfirmEmailFields(values: Record<string, unknown>) {
   const { newPassword, confirmNewPassword } = values;
-  console.log("🚀 ~ getConfirmEmailFields ~ values:", values)
+  console.log("🚀 ~ getConfirmEmailFields ~ values:", values);
   if (!newPassword) {
     throw new Error("La contraseña es obligatoria");
   }
@@ -24,7 +25,6 @@ function getConfirmEmailFields(values: Record<string, unknown>) {
   if (newPassword !== confirmNewPassword) {
     throw new Error("Las contraseñas no coinciden");
   }
-
 
   return {
     password: String(newPassword),
@@ -48,13 +48,14 @@ const PasswordChangePage = () => {
       if (!hashParam || hashParam.trim() === "") {
         throw new Error("Parámetros de hash o expiración faltantes");
       }
-      
+
       const fields = getConfirmEmailFields(values);
       await resetPassword(hashParam, fields.password);
       messageApi.success("Contraseña cambiada exitosamente", 10, () => {
         router.push("/sign-in");
       });
     } catch (error) {
+      console.log("🚀 ~ handleSubmit ~ error:", error);
       messageApi.error(
         `Error al cambiar la contraseña: ${getErrorMessage(error)}`,
       );
@@ -75,18 +76,7 @@ const PasswordChangePage = () => {
       }}
       vertical
     >
-      <Image
-        src="/images/logo.png"
-        alt="Auto Park UASD"
-        width={855}
-        height={247}
-        style={{
-          width: "100%",
-          maxWidth: 300,
-          height: "auto",
-          marginBottom: 44,
-        }}
-      />
+      <AppLogo />
       <Title level={4}> Cambiar Contraseña</Title>
       <Text style={{ textAlign: "center" }} type="secondary">
         Por favor complete el formulario para cambiar su contraseña.

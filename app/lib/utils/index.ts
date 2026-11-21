@@ -1,3 +1,5 @@
+import { HttpError } from "../http";
+
 export const requiredText = (
   values: Record<string, unknown>,
   key: string,
@@ -11,8 +13,11 @@ export const requiredText = (
 };
 
 export const getErrorMessage = (error: unknown) => {
-  console.log("🚀 ~ getErrorMessage ~ error:", error);
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
+  if (error instanceof HttpError) {
+    const body = error.body as { message?: string | string[] };
+    return Array.isArray(body.message)
+      ? body.message.join(", ")
+      : (body.message ?? `Error HTTP ${error.status}`);
+  }
+  return "Ocurrió un error inesperado.";
 };

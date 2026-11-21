@@ -7,6 +7,7 @@ import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { getSidebarNavState, SidebarNavItemConfig } from "./SideNav";
 import { CurrentUser, HeaderUserSection } from "./HeaderUserSection";
 import Link from "next/link";
+import { AppLogo } from "../AppLogo";
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -92,37 +93,9 @@ const AppShellLayout = ({
           vertical
         >
           {collapsed ? (
-            <Image
-              src="/images/logo-without-name.png"
-              alt="Auto Park UASD"
-              width={40}
-              height={60}
-              style={{
-                width: "100%",
-                maxWidth: 60,
-                height: "auto",
-              }}
-            />
+            <AppLogo variant="sideCollapsed" />
           ) : (
-            <Image
-              src="/images/logo2.png"
-              alt="Auto Park UASD"
-              width={230}
-              height={60}
-              style={{
-                width: "100%",
-                maxWidth: 230,
-                height: "auto",
-              }}
-            />
-            // <>
-            //   <Title level={3} style={{ color: "white", margin: 0 }}>
-            //     AutoPark
-            //   </Title>
-            //   <Text style={{ color: "rgba(255,255,255,0.65)" }}>
-            //     Sistema de gestión de parqueos
-            //   </Text>
-            // </>
+            <AppLogo variant="side" />
           )}
         </Flex>
 
