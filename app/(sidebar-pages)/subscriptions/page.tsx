@@ -32,7 +32,11 @@ import {
   SubscriptionsService,
   Subscription,
 } from "@/app/lib/api/subscriptions";
-import { getParkingSpaces, ParkingSpace } from "@/app/lib/api/spaces";
+import {
+  getParkingSpaces,
+  ParkingSpace,
+  updateParkingSpace,
+} from "@/app/lib/api/spaces";
 import { getPaymentsPaginated, Payment } from "@/app/lib/api/payments";
 
 import { SubscriptionsTable } from "./components/SubscriptionsTable";
@@ -275,8 +279,24 @@ const SubscriptionsPage = () => {
 
   const handleDeleteSubscription = async (id: number) => {
     try {
+      const targetSub = subscriptions.find((s) => Number(s.id) === Number(id));
+      const spaceId = Number(
+        targetSub?.parkingSpaceId ?? targetSub?.parkingSpace?.id ?? 0,
+      );
+
       await SubscriptionsService.remove(id);
-      messageApi.success("Suscripción eliminada de la base de datos.");
+
+      if (Number.isInteger(spaceId) && spaceId > 0) {
+        try {
+          await updateParkingSpace(spaceId, { status: "FREE" });
+        } catch (spaceError) {
+          console.error("No se pudo liberar el espacio al eliminar suscripción:", spaceError);
+        }
+      }
+
+      messageApi.success(
+        "Suscripción eliminada y espacio liberado correctamente.",
+      );
       await fetchData();
     } catch {
       messageApi.error("No se pudo eliminar la suscripción.");

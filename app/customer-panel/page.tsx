@@ -167,6 +167,7 @@ export default function CustomerPanelPage() {
   const [scannedPlate, setScannedPlate] = useState(DEFAULT_PLATES[0]);
   const [assignedSpaceVal, setAssignedSpaceVal] = useState("N/A");
   const [ticketRateVal, setTicketRateVal] = useState<number | string | null>(null);
+  const [isSubscriptionTicket, setIsSubscriptionTicket] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [countdown, setCountdown] = useState(5);
@@ -241,6 +242,7 @@ export default function CustomerPanelPage() {
     space: string;
     entryTime?: string;
     rate?: number | string | null;
+    isSubscription?: boolean;
   }) => {
     clearTimers();
     setErrorMsg(null);
@@ -253,6 +255,7 @@ export default function CustomerPanelPage() {
     setTicketCodeVal(data.code || `TCK-${Date.now()}`);
     setAssignedSpaceVal(data.space || "N/A");
     setTicketRateVal(data.rate ?? null);
+    setIsSubscriptionTicket(Boolean(data.isSubscription));
     setStep("ticket");
 
     flowTimeoutRef.current = setTimeout(() => {
@@ -283,6 +286,7 @@ export default function CustomerPanelPage() {
         space: ticket.spot?.spaceNumber || ticket.spaceNumber || ticket.spotNumber || "N/A",
         entryTime: ticket.entranceAt,
         rate: ticket.rateAmount ?? ticket.rate_amount ?? ticket.rate?.amount ?? null,
+        isSubscription: false,
       });
     } catch (err) {
       const msg = getErrMsg(err);
@@ -299,9 +303,30 @@ export default function CustomerPanelPage() {
     setErrorMsg(null);
     try {
       const plate = String(res.vehiclePlateNumber ?? res.vehicle_plate_number ?? "").trim().toUpperCase();
+
+      if (res.isSubscriptionPass) {
+        const space =
+          res.parkingSpaceNumber ||
+          res.parkingSpace?.spaceNumber ||
+          res.parkingLotName ||
+          res.parkingSpace?.floor?.lot?.name ||
+          "N/A";
+
+        openTicketThenGate({
+          plate: plate || "N/A",
+          code: res.qrCode ?? res.qr_code ?? reservationCode.trim(),
+          space,
+          entryTime: new Date().toISOString(),
+          rate: null,
+          isSubscription: true,
+        });
+        setReservationCode("");
+        return;
+      }
+
       const resId = Number(res.id);
 
-      if (!res.isSubscriptionPass && Number.isInteger(resId) && resId > 0) {
+      if (Number.isInteger(resId) && resId > 0) {
         const ticket = (await checkInTicket({ reservationId: resId })) as TicketExt;
         openTicketThenGate({
           plate: ticket.vehiclePlateNumber || plate || DEFAULT_PLATES[0],
@@ -309,6 +334,7 @@ export default function CustomerPanelPage() {
           space: ticket.spot?.spaceNumber || ticket.spaceNumber || "N/A",
           entryTime: ticket.entranceAt,
           rate: ticket.rateAmount ?? ticket.rate_amount ?? ticket.rate?.amount ?? null,
+          isSubscription: false,
         });
         setReservationCode("");
         return;
@@ -328,6 +354,7 @@ export default function CustomerPanelPage() {
         space: gate.assignedSpace || "N/A",
         entryTime: gate.entryTime,
         rate: gate.rateAmount ?? gate.rate_amount ?? null,
+        isSubscription: false,
       });
       setReservationCode("");
     } catch (err) {
@@ -454,6 +481,7 @@ export default function CustomerPanelPage() {
               plateNumberVal={scannedPlate}
               assignedSpaceVal={assignedSpaceVal}
               rateVal={ticketRateVal}
+              isSubscription={isSubscriptionTicket}
               dict={dict}
             />
           )}

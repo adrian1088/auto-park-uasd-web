@@ -2,10 +2,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Flex, message } from "antd";
+import { Button, Col, Flex, message, Row, Select, Space } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import HeaderPage from "@/app/components/HeaderPage";
+import { getParkingLots, type ParkingLot } from "@/app/lib/api/lots";
 import {
   getParkingSpaces,
   type ParkingSpace,
@@ -22,15 +23,34 @@ import {
   type Subscription,
 } from "@/app/lib/api/subscriptions";
 import { getReservationsPaginated } from "@/app/lib/api/reservations";
-import { DashboardQuickActions } from "./components/QuickActions";
-import { DashboardKpis } from "./components/DashboardKpis";
+import { DashboardKpis } from "../components/dashboard/DashboardKpis";
 import {
   DashboardFilters,
   type DateRangeFilter,
-} from "./components/Filters";
-import { DashboardChartsAndOccupancy } from "./components/ChartsAndOccupancy";
-import { RecentActivityCard } from "./components/RecentActivityCard";
-import { ParkingMapCard } from "./components/ParkingMapCard";
+} from "../components/dashboard/Filters";
+import { DashboardChartsAndOccupancy } from "../components/dashboard/ChartsAndOccupancy";
+import { RecentActivityCard } from "../components/dashboard/RecentActivityCard";
+import { ParkingMapCard } from "../components/dashboard/ParkingMapCard";
+import { OperationalSummaryCard } from "../components/dashboard/OperationalSummaryCard";
+
+type PaymentWithFallbackDates = Payment & {
+  createdAt?: string;
+  paidAt?: string;
+};
+
+type TicketWithFallbackDates = Ticket & {
+  createdAt?: string;
+};
+
+function resolvePaymentDate(
+  payment: PaymentWithFallbackDates,
+): string | undefined {
+  return payment.date || payment.paidAt || payment.createdAt;
+}
+
+function resolveTicketDate(ticket: TicketWithFallbackDates): string | undefined {
+  return ticket.entranceAt || ticket.createdAt;
+}
 
 function isWithinRange(
   dateStr: string | undefined,
@@ -41,16 +61,63 @@ function isWithinRange(
   const date = dayjs(dateStr);
   if (!date.isValid()) return false;
 
+  const now = dayjs();
+
   if (range === "TODAY") {
-    return date.isSame(dayjs(), "day");
+    return date.isSame(now, "day");
   }
   if (range === "7D") {
-    return date.isAfter(dayjs().subtract(7, "day"));
+    const startOf7DaysAgo = now.subtract(6, "day").startOf("day");
+    return !date.isBefore(startOf7DaysAgo);
   }
   if (range === "MONTH") {
-    return date.isSame(dayjs(), "month") && date.isSame(dayjs(), "year");
+    return date.isSame(now, "month") && date.isSame(now, "year");
   }
   return true;
+}
+
+function getItemLotId(item: unknown): number | undefined {
+  if (!item || typeof item !== "object") return undefined;
+  const rec = item as Record<string, unknown>;
+
+  const direct =
+    rec.lotId ??
+    rec.parkingLotId ??
+    (rec.lot as Record<string, unknown> | undefined)?.id ??
+    (rec.parkingLot as Record<string, unknown> | undefined)?.id;
+
+  if (direct !== undefined && direct !== null && String(direct).trim() !== "") {
+    const num = Number(direct);
+    if (!Number.isNaN(num)) return num;
+  }
+
+  const floor = rec.floor as Record<string, unknown> | undefined;
+  const floorLot =
+    floor?.lotId ??
+    floor?.parkingLotId ??
+    (floor?.lot as Record<string, unknown> | undefined)?.id;
+  if (
+    floorLot !== undefined &&
+    floorLot !== null &&
+    String(floorLot).trim() !== ""
+  ) {
+    const num = Number(floorLot);
+    if (!Number.isNaN(num)) return num;
+  }
+
+  const spot = (rec.spot ?? rec.space) as Record<string, unknown> | undefined;
+  if (spot) {
+    const spotLot = getItemLotId(spot);
+    if (spotLot !== undefined) return spotLot;
+  }
+
+  const ticket = rec.ticket as Record<string, unknown> | undefined;
+  if (ticket) {
+    const ticketLot = getItemLotId(ticket);
+    if (ticketLot !== undefined) return ticketLot;
+  }
+
+  return undefined;
 }
 
 export default function DashboardPage() {
@@ -58,13 +125,17 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [lots, setLots] = useState<ParkingLot[]>([]);
+  const [selectedLot, setSelectedLot] = useState<number | "ALL">(1);
+
   const [spaces, setSpaces] = useState<ParkingSpace[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [, setReservationsTotal] = useState<number>(0);
+  const [reservations, setReservations] = useState<unknown[]>([]);
+  const [reservationsTotal, setReservationsTotal] = useState<number>(0);
 
-  const [dateRange, setDateRange] = useState<DateRangeFilter>("TODAY");
+  const [dateRange, setDateRange] = useState<DateRangeFilter>("ALL");
   const [methodFilter, setMethodFilter] = useState<PaymentMethod | "ALL">(
     "ALL",
   );
@@ -73,19 +144,33 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      const [spacesRes, ticketsRes, paymentsRes, subsRes, reservationsRes] =
-        await Promise.all([
-          getParkingSpaces(),
-          getTicketsPaginated({ page: 1, limit: 100 }),
-          getPaymentsPaginated({ page: 1, limit: 100 }),
-          SubscriptionsService.findAll(),
-          getReservationsPaginated({ page: 1, limit: 1 }),
-        ]);
+      const [
+        lotsRes,
+        spacesRes,
+        ticketsRes,
+        paymentsRes,
+        subsRes,
+        reservationsRes,
+      ] = await Promise.all([
+        getParkingLots().catch(() => []),
+        getParkingSpaces(),
+        getTicketsPaginated({ page: 1, limit: 100 }),
+        getPaymentsPaginated({ page: 1, limit: 100 }),
+        SubscriptionsService.findAll(),
+        getReservationsPaginated({ page: 1, limit: 100 }).catch(() => ({
+          data: [],
+          meta: { total: 0 },
+        })),
+      ]);
 
+      setLots(Array.isArray(lotsRes) ? lotsRes : []);
       setSpaces(Array.isArray(spacesRes) ? spacesRes : []);
       setTickets(ticketsRes?.data ?? []);
       setPayments(paymentsRes?.data ?? []);
       setSubscriptions(Array.isArray(subsRes) ? subsRes : []);
+      setReservations(
+        Array.isArray(reservationsRes?.data) ? reservationsRes.data : [],
+      );
       setReservationsTotal(reservationsRes?.meta?.total ?? 0);
       setRefreshTrigger((prev) => prev + 1);
     } catch {
@@ -101,12 +186,112 @@ export default function DashboardPage() {
     void loadDashboardData();
   }, [loadDashboardData]);
 
+  const lotSpaces = useMemo(() => {
+    if (selectedLot === "ALL") return spaces;
+    return spaces.filter((space) => getItemLotId(space) === Number(selectedLot));
+  }, [spaces, selectedLot]);
+
+  const lotSpaceNumbers = useMemo(() => {
+    const nums = new Set<string>();
+    for (const space of lotSpaces) {
+      const rec = space as Record<string, unknown>;
+      const raw = String(rec.spaceNumber ?? rec.number ?? rec.code ?? "")
+        .trim()
+        .toLowerCase();
+      if (raw) nums.add(raw);
+    }
+    return nums;
+  }, [lotSpaces]);
+
+  const lotTickets = useMemo(() => {
+    if (selectedLot === "ALL") return tickets;
+    return tickets.filter((ticket) => {
+      const lotId = getItemLotId(ticket);
+      if (lotId !== undefined) return lotId === Number(selectedLot);
+
+      const rec = ticket as Record<string, unknown>;
+      const spotRec = rec.spot as Record<string, unknown> | undefined;
+      const spaceNum = String(
+        rec.spaceNumber ?? spotRec?.spaceNumber ?? rec.spotNumber ?? "",
+      )
+        .trim()
+        .toLowerCase();
+      return spaceNum ? lotSpaceNumbers.has(spaceNum) : false;
+    });
+  }, [tickets, selectedLot, lotSpaceNumbers]);
+
+  const lotTicketIds = useMemo(() => {
+    const ids = new Set<string | number>();
+    for (const ticket of lotTickets) {
+      if (ticket.id !== undefined && ticket.id !== null) {
+        ids.add(ticket.id);
+      }
+    }
+    return ids;
+  }, [lotTickets]);
+
+  const lotPayments = useMemo(() => {
+    if (selectedLot === "ALL") return payments;
+    return payments.filter((payment) => {
+      const lotId = getItemLotId(payment);
+      if (lotId !== undefined) return lotId === Number(selectedLot);
+
+      const rec = payment as Record<string, unknown>;
+      const ticketRec = rec.ticket as Record<string, unknown> | undefined;
+      const ticketId = rec.ticketId ?? ticketRec?.id;
+      if (
+        ticketId !== undefined &&
+        ticketId !== null &&
+        lotTicketIds.has(ticketId as string | number)
+      ) {
+        return true;
+      }
+
+      const spotRec = ticketRec?.spot as Record<string, unknown> | undefined;
+      const spaceNum = String(ticketRec?.spaceNumber ?? spotRec?.spaceNumber ?? "")
+        .trim()
+        .toLowerCase();
+      return spaceNum ? lotSpaceNumbers.has(spaceNum) : false;
+    });
+  }, [payments, selectedLot, lotTicketIds, lotSpaceNumbers]);
+
+  const lotSubscriptions = useMemo(() => {
+    if (selectedLot === "ALL") return subscriptions;
+    return subscriptions.filter((sub) => {
+      const lotId = getItemLotId(sub);
+      if (lotId !== undefined) return lotId === Number(selectedLot);
+      return true;
+    });
+  }, [subscriptions, selectedLot]);
+
+  const lotReservationsCount = useMemo(() => {
+    if (selectedLot === "ALL") return reservationsTotal;
+    if (reservations.length === 0) return 0;
+    return reservations.filter((resItem) => {
+      const lotId = getItemLotId(resItem);
+      if (lotId !== undefined) return lotId === Number(selectedLot);
+      const rec = resItem as Record<string, unknown>;
+      const spotRec = rec.spot as Record<string, unknown> | undefined;
+      const spaceNum = String(rec.spaceNumber ?? spotRec?.spaceNumber ?? "")
+        .trim()
+        .toLowerCase();
+      return spaceNum ? lotSpaceNumbers.has(spaceNum) : false;
+    }).length;
+  }, [reservations, reservationsTotal, selectedLot, lotSpaceNumbers]);
+
   const filteredPayments = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    return payments.filter((payment) => {
-      if (!isWithinRange(payment.date, dateRange)) return false;
-      if (methodFilter !== "ALL" && payment.method !== methodFilter)
+    return lotPayments.filter((payment) => {
+      const paymentDate = resolvePaymentDate(payment as PaymentWithFallbackDates);
+      if (!isWithinRange(paymentDate, dateRange)) return false;
+
+      const normalizedMethod = String(payment.method || "")
+        .trim()
+        .toUpperCase();
+      if (methodFilter !== "ALL" && normalizedMethod !== methodFilter) {
         return false;
+      }
+
       if (q) {
         const plate = (
           payment.ticket?.vehiclePlateNumber ||
@@ -119,18 +304,26 @@ export default function DashboardPage() {
           ""
         ).toLowerCase();
         const origin = (payment.originLabel || "").toLowerCase();
-        if (!plate.includes(q) && !space.includes(q) && !origin.includes(q)) {
+        const methodText = normalizedMethod.toLowerCase();
+        if (
+          !plate.includes(q) &&
+          !space.includes(q) &&
+          !origin.includes(q) &&
+          !methodText.includes(q)
+        ) {
           return false;
         }
       }
       return true;
     });
-  }, [payments, dateRange, methodFilter, searchText]);
+  }, [lotPayments, dateRange, methodFilter, searchText]);
 
   const filteredTickets = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      if (!isWithinRange(ticket.entranceAt, dateRange)) return false;
+    return lotTickets.filter((ticket) => {
+      const ticketDate = resolveTicketDate(ticket as TicketWithFallbackDates);
+      if (!isWithinRange(ticketDate, dateRange)) return false;
+
       if (q) {
         const plate = (
           ticket.vehiclePlateNumber ||
@@ -150,7 +343,7 @@ export default function DashboardPage() {
       }
       return true;
     });
-  }, [tickets, dateRange, searchText]);
+  }, [lotTickets, dateRange, searchText]);
 
   const spaceCountsByStatus = useMemo(() => {
     const counts: Record<ParkingSpaceStatus, number> = {
@@ -159,13 +352,16 @@ export default function DashboardPage() {
       RESERVED: 0,
       OUT_OF_SERVICE: 0,
     };
-    for (const space of spaces) {
-      if (space.status in counts) {
-        counts[space.status] += 1;
+    for (const space of lotSpaces) {
+      const st = String(space.status || "")
+        .trim()
+        .toUpperCase() as ParkingSpaceStatus;
+      if (st in counts) {
+        counts[st] += 1;
       }
     }
     return counts;
-  }, [spaces]);
+  }, [lotSpaces]);
 
   const revenueByMethod = useMemo(() => {
     const totals: Record<PaymentMethod, number> = {
@@ -175,8 +371,11 @@ export default function DashboardPage() {
       PAYPAL: 0,
     };
     for (const payment of filteredPayments) {
-      if (payment.method in totals) {
-        totals[payment.method] += Number(payment.amount || 0);
+      const method = String(payment.method || "")
+        .trim()
+        .toUpperCase() as PaymentMethod;
+      if (method in totals) {
+        totals[method] += Number(payment.amount || 0);
       }
     }
     return totals;
@@ -189,48 +388,74 @@ export default function DashboardPage() {
   );
 
   const activeTicketsCount = useMemo(
-    () => tickets.filter((t) => t.status === "ACTIVE").length,
-    [tickets],
+    () =>
+      lotTickets.filter(
+        (t) => String(t.status || "").trim().toUpperCase() === "ACTIVE",
+      ).length,
+    [lotTickets],
   );
 
   const activeSubscriptionsCount = useMemo(
     () =>
-      subscriptions.filter(
-        (s) => !dayjs().isAfter(dayjs(s.endDate)) && s.status === "ACTIVE",
+      lotSubscriptions.filter(
+        (s) =>
+          !dayjs().isAfter(dayjs(s.endDate)) &&
+          String(s.status || "").trim().toUpperCase() === "ACTIVE",
       ).length,
-    [subscriptions],
+    [lotSubscriptions],
   );
+
+  const lotOptions = useMemo(() => {
+    const items = lots.map((lot) => ({
+      label: lot.name,
+      value: Number(lot.id),
+    }));
+    if (items.length === 0) {
+      items.push({ label: "Lote 1", value: 1 });
+    }
+    return [{ label: "Todos los lotes", value: "ALL" as const }, ...items];
+  }, [lots]);
 
   return (
     <Flex vertical gap={14}>
       {contextHolder}
 
       <Flex justify="space-between" align="flex-start" wrap="wrap" gap={12}>
-        <HeaderPage title="Dashboard Operativo" />
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={() => void loadDashboardData()}
-          loading={loading}
-        >
-          Actualizar Panel
-        </Button>
+        <HeaderPage title="Dashboard" />
+        <Space wrap size={8}>
+          <Select
+            size="small"
+            style={{ minWidth: 200 }}
+            value={selectedLot}
+            onChange={(val) => setSelectedLot(val)}
+            options={lotOptions}
+          />
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => void loadDashboardData()}
+            loading={loading}
+          >
+            Actualizar Panel
+          </Button>
+        </Space>
       </Flex>
-
-      <DashboardQuickActions />
 
       <DashboardKpis
         loading={loading}
-        totalSpaces={spaces.length}
+        totalSpaces={lotSpaces.length}
         occupiedSpaces={spaceCountsByStatus.OCCUPIED}
         freeSpaces={spaceCountsByStatus.FREE}
         activeTicketsCount={activeTicketsCount}
         periodRevenue={totalPeriodRevenue}
         periodPaymentsCount={filteredPayments.length}
         activeSubscriptionsCount={activeSubscriptionsCount}
-        totalSubscriptionsCount={subscriptions.length}
+        totalSubscriptionsCount={lotSubscriptions.length}
       />
 
-      <ParkingMapCard refreshTrigger={refreshTrigger} />
+      <ParkingMapCard
+        refreshTrigger={refreshTrigger}
+        selectedLot={selectedLot}
+      />
 
       <DashboardFilters
         dateRange={dateRange}
@@ -240,19 +465,36 @@ export default function DashboardPage() {
         onMethodFilterChange={setMethodFilter}
         onSearchTextChange={setSearchText}
         onClear={() => {
-          setDateRange("TODAY");
+          setDateRange("ALL");
           setMethodFilter("ALL");
           setSearchText("");
         }}
       />
 
-      <DashboardChartsAndOccupancy
-        loading={loading}
-        revenueByMethod={revenueByMethod}
-        totalPeriodRevenue={totalPeriodRevenue}
-        spaceCountsByStatus={spaceCountsByStatus}
-        totalSpaces={spaces.length}
-      />
+      <Row gutter={[12, 12]}>
+        <Col xs={24} lg={12}>
+          <DashboardChartsAndOccupancy
+            loading={loading}
+            revenueByMethod={revenueByMethod}
+            totalPeriodRevenue={totalPeriodRevenue}
+            spaceCountsByStatus={spaceCountsByStatus}
+            totalSpaces={lotSpaces.length}
+          />
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <OperationalSummaryCard
+            loading={loading}
+            activeTicketsCount={activeTicketsCount}
+            totalTicketsCount={filteredTickets.length}
+            reservationsTotal={lotReservationsCount}
+            activeSubscriptionsCount={activeSubscriptionsCount}
+            totalSubscriptionsCount={lotSubscriptions.length}
+            periodRevenue={totalPeriodRevenue}
+            periodPaymentsCount={filteredPayments.length}
+          />
+        </Col>
+      </Row>
 
       <RecentActivityCard
         loading={loading}

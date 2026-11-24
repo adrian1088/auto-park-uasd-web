@@ -3,33 +3,13 @@
 import React, { useEffect, useState, useCallback, useTransition } from "react";
 import { Card, Typography, Tag, Spin, Tooltip, Select, Space } from "antd";
 import { EnvironmentOutlined, CheckCircleFilled, CarFilled, CloseCircleFilled, TagFilled } from "@ant-design/icons";
+import { http } from "@/app/lib/http";
+import type { ApiResponseList } from "@/app/lib/api/base";
+import { getParkingLots, type ParkingLot } from "@/app/lib/api/lots";
+import { getParkingSpaces, type ParkingSpace } from "@/app/lib/api/spaces";
+import type { ParkingFloor } from "@/app/lib/api/floors";
 
 const { Text } = Typography;
-
-interface ParkingLot {
-  id: string | number;
-  name: string;
-}
-
-interface ParkingFloor {
-  id: string | number;
-  floorNumber: number;
-}
-
-interface ParkingSpaceItem {
-  id: string | number;
-  spaceNumber: string;
-  type: string;
-  status: string;
-  floor?: {
-    id: string | number;
-    floorNumber: number;
-    lot?: {
-      id: string | number;
-      name: string;
-    };
-  };
-}
 
 interface ParkingMapProps {
   refreshTrigger: number;
@@ -38,22 +18,23 @@ interface ParkingMapProps {
 export default function ParkingMap({ refreshTrigger }: ParkingMapProps) {
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [floors, setFloors] = useState<ParkingFloor[]>([]);
-  const [spaces, setSpaces] = useState<ParkingSpaceItem[]>([]);
+  const [spaces, setSpaces] = useState<ParkingSpace[]>([]);
 
-  const [selectedLotId, setSelectedLotId] = useState<string | number>(1);
+  const [selectedLotId, setSelectedLotId] = useState<string | number | undefined>(undefined);
   const [selectedFloorId, setSelectedFloorId] = useState<string | number | undefined>(undefined);
 
   const [loading, startTransition] = useTransition();
 
   const fetchLots = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:3001/api/v1/parking/lots", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const lotsList = Array.isArray(result) ? result : result?.data || [];
-        setLots(lotsList);
+      const lotsList = await getParkingLots();
+      const safeLots = Array.isArray(lotsList) ? lotsList : [];
+      setLots(safeLots);
+      if (safeLots.length > 0) {
+        setSelectedLotId((prev) => {
+          const exists = safeLots.some((l) => String(l.id) === String(prev));
+          return exists ? prev : safeLots[0].id;
+        });
       }
     } catch (error) {
       console.error("Error al cargar los lotes:", error);
@@ -62,18 +43,16 @@ export default function ParkingMap({ refreshTrigger }: ParkingMapProps) {
 
   const fetchFloors = useCallback(async (lotId: string | number) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/v1/parking/floors?lotId=${lotId}`, {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const floorsList = Array.isArray(result) ? result : result?.data || [];
-        setFloors(floorsList);
-        if (floorsList.length > 0) {
-          setSelectedFloorId(floorsList[0].id);
-        } else {
-          setSelectedFloorId(undefined);
-        }
+      const response = await http.get<ApiResponseList<ParkingFloor>>(
+        "/parking/floors",
+        { query: { lotId } },
+      );
+      const floorsList = Array.isArray(response?.data) ? response.data : [];
+      setFloors(floorsList);
+      if (floorsList.length > 0) {
+        setSelectedFloorId(floorsList[0].id);
+      } else {
+        setSelectedFloorId(undefined);
       }
     } catch (error) {
       console.error("Error al cargar los pisos:", error);
@@ -82,18 +61,11 @@ export default function ParkingMap({ refreshTrigger }: ParkingMapProps) {
 
   const fetchSpaces = useCallback(async (lotId: string | number, floorId?: string | number) => {
     try {
-      let url = `http://localhost:3001/api/v1/parking/spaces?lotId=${lotId}`;
-      if (floorId) {
-        url += `&floorId=${floorId}`;
-      }
-      const res = await fetch(url, {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const spacesList: ParkingSpaceItem[] = Array.isArray(result) ? result : result?.data || [];
-        setSpaces(spacesList);
-      }
+      const spacesList = await getParkingSpaces(
+        Number(lotId),
+        floorId !== undefined ? Number(floorId) : undefined,
+      );
+      setSpaces(Array.isArray(spacesList) ? spacesList : []);
     } catch (error) {
       console.error("Error al cargar los espacios:", error);
     }
@@ -106,7 +78,7 @@ export default function ParkingMap({ refreshTrigger }: ParkingMapProps) {
   }, [fetchLots]);
 
   useEffect(() => {
-    if (selectedLotId) {
+    if (selectedLotId !== undefined) {
       startTransition(() => {
         fetchFloors(selectedLotId);
       });
@@ -114,7 +86,7 @@ export default function ParkingMap({ refreshTrigger }: ParkingMapProps) {
   }, [selectedLotId, fetchFloors]);
 
   useEffect(() => {
-    if (selectedLotId) {
+    if (selectedLotId !== undefined) {
       startTransition(() => {
         fetchSpaces(selectedLotId, selectedFloorId);
       });

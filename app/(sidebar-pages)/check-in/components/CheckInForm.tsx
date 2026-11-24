@@ -8,6 +8,10 @@ import {
   FileDoneOutlined,
   ClockCircleOutlined,
 } from "@ant-design/icons";
+import {
+  SubscriptionsService,
+  type Subscription,
+} from "@/app/lib/api/subscriptions";
 
 const { Text } = Typography;
 
@@ -38,6 +42,47 @@ function formatCurrentDateTime(date: Date): string {
   return `${formattedDate} · ${formattedTime}`;
 }
 
+function findMatchingSubscription(
+  subscriptions: Subscription[],
+  rawInput: string,
+): Subscription | undefined {
+  const normalized = rawInput.trim().toUpperCase();
+  if (!normalized) return undefined;
+
+  if (normalized.startsWith("SUB-")) {
+    const exactCodeMatch = subscriptions.find((sub) => {
+      const rec = sub as unknown as Record<string, unknown>;
+      const candidates = [
+        rec.qrCode,
+        rec.qr_code,
+        rec.code,
+        `SUB-${sub.id}`,
+        `SUB-QR-${sub.id}`,
+      ]
+        .filter((v) => v !== undefined && v !== null)
+        .map((v) => String(v).trim().toUpperCase());
+
+      return candidates.includes(normalized);
+    });
+
+    if (exactCodeMatch) return exactCodeMatch;
+
+    const trailingDigits = normalized.match(/(\d+)$/);
+    if (trailingDigits) {
+      const targetId = Number(trailingDigits[1]);
+      return subscriptions.find((sub) => Number(sub.id) === targetId);
+    }
+  }
+
+  return subscriptions.find((sub) => {
+    const plates = String(sub.plateNumbers || "")
+      .split(",")
+      .map((p) => p.trim().toUpperCase())
+      .filter(Boolean);
+    return plates.includes(normalized);
+  });
+}
+
 export default function CheckInForm({
   entryType,
   setEntryType,
@@ -51,6 +96,28 @@ export default function CheckInForm({
   const [currentDateTime, setCurrentDateTime] = useState<string>(() =>
     formatCurrentDateTime(new Date()),
   );
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [matchedSubscription, setMatchedSubscription] =
+    useState<Subscription | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    SubscriptionsService.findAll()
+      .then((list) => {
+        if (active) {
+          setSubscriptions(Array.isArray(list) ? list : []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSubscriptions([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -60,10 +127,44 @@ export default function CheckInForm({
     return () => clearInterval(interval);
   }, []);
 
+  const syncSubscriptionData = (rawValue: string) => {
+    const upperValue = rawValue.toUpperCase();
+    const matched = findMatchingSubscription(subscriptions, upperValue);
+
+    if (matched) {
+      setMatchedSubscription(matched);
+      const firstPlate =
+        String(matched.plateNumbers || "")
+          .split(",")
+          .map((p) => p.trim().toUpperCase())
+          .find(Boolean) || upperValue;
+
+      setPlateNumber(firstPlate);
+      setUserId?.(matched.userId ?? null);
+
+      if (upperValue.startsWith("SUB-")) {
+        setReservationCode(upperValue);
+      } else {
+        setReservationCode(`SUB-${matched.id}`);
+      }
+      return;
+    }
+
+    setMatchedSubscription(null);
+    setPlateNumber(upperValue);
+    setUserId?.(null);
+    if (upperValue.startsWith("SUB-")) {
+      setReservationCode(upperValue);
+    } else {
+      setReservationCode("");
+    }
+  };
+
   const handleModeChange = (
     nextMode: "SIN_RESERVACION" | "CON_RESERVACION",
   ) => {
     setEntryType(nextMode);
+    setMatchedSubscription(null);
     if (nextMode === "SIN_RESERVACION") {
       setReservationCode("");
     } else {
@@ -71,6 +172,19 @@ export default function CheckInForm({
       setUserId?.(null);
     }
   };
+
+  const locationSummary = matchedSubscription
+    ? [
+        matchedSubscription.parkingSpace?.spaceNumber
+          ? `Espacio ${matchedSubscription.parkingSpace.spaceNumber}`
+          : matchedSubscription.parkingSpaceId
+            ? `Espacio #${matchedSubscription.parkingSpaceId}`
+            : "",
+        matchedSubscription.rate?.parkingLot?.name || "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <div
@@ -121,9 +235,9 @@ export default function CheckInForm({
           >
             <Input
               size="large"
-              placeholder="Ej: A-123456"
+              placeholder="Ej: A-123456 o SUB-..."
               value={plateNumber}
-              onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
+              onChange={(e) => syncSubscriptionData(e.target.value)}
               style={{ width: "100%", borderRadius: "8px", fontWeight: "bold" }}
               prefix={<CarOutlined style={{ color: "#0284c7" }} />}
             />
@@ -147,6 +261,15 @@ export default function CheckInForm({
             />
           </Form.Item>
         </div>
+
+        {matchedSubscription && (
+          <div style={{ marginBottom: "12px" }}>
+            <Text type="secondary" style={{ fontSize: "12px" }}>
+              Suscriptor: <strong>{matchedSubscription.user?.name || `ID #${matchedSubscription.userId}`}</strong>
+              {locationSummary ? ` · ${locationSummary}` : ""}
+            </Text>
+          </div>
+        )}
       </Form>
 
       <Button

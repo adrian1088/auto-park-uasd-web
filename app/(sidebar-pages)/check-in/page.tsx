@@ -14,6 +14,7 @@ import ReservationQrScanner, {
 } from "../../components/gate/ReservationQrScanner";
 import { processGateEntry, GateEntryResult } from "@/app/lib/api/gate";
 import { checkInTicket, type Ticket } from "@/app/lib/api/tickets";
+import { getParkingSpaces } from "@/app/lib/api/spaces";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -26,6 +27,7 @@ interface DiagnosticState {
 type ExtendedGateEntryResult = GateEntryResult & {
   rateAmount?: number | string | null;
   rate_amount?: number | string | null;
+  isSubscription?: boolean;
 };
 
 type TicketLikeResponse = Ticket & {
@@ -42,10 +44,6 @@ type TicketLikeResponse = Ticket & {
     parkingSpace?: { spaceNumber?: string; space_number?: string } | null;
   } | null;
 };
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
-).replace(/\/$/, "");
 
 function mapTicketToReceipt(
   createdTicket: TicketLikeResponse,
@@ -85,6 +83,7 @@ function mapTicketToReceipt(
     assignedSpace: String(space).trim() || "ASIGNADO",
     entryTime: createdTicket.entranceAt || createdTicket.entrance_at || new Date().toISOString(),
     rateAmount: resolvedRate,
+    isSubscription: false,
   };
 }
 
@@ -197,32 +196,10 @@ export default function CheckInPage() {
     });
 
     try {
-      const res = await fetch(`${API_BASE_URL}/parking/spaces?lotId=1`, {
-        credentials: "include",
-      });
+      const spacesList = await getParkingSpaces(1);
+      const safeSpaces = Array.isArray(spacesList) ? spacesList : [];
 
-      if (res.status === 401) {
-        setDiagnostic({
-          status: "ERROR",
-          message: "Error HTTP 401: No autorizado (Token JWT ausente o expirado).",
-          details: "Inicia sesión nuevamente en el sistema.",
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        setDiagnostic({
-          status: "ERROR",
-          message: `El backend respondió con un error HTTP ${res.status}: ${res.statusText}`,
-          details: "Verifica que el servicio esté activo en NestJS.",
-        });
-        return;
-      }
-
-      const result = await res.json();
-      const spacesList = Array.isArray(result) ? result : result?.data || [];
-
-      if (spacesList.length === 0) {
+      if (safeSpaces.length === 0) {
         setDiagnostic({
           status: "WARNING",
           message: "La API devolvió 0 espacios registrados para el Lote ID 1.",
@@ -231,15 +208,39 @@ export default function CheckInPage() {
       } else {
         setDiagnostic({
           status: "OK",
-          message: `Conexión exitosa. Se detectaron ${spacesList.length} espacios activos.`,
+          message: `Conexión exitosa. Se detectaron ${safeSpaces.length} espacios activos.`,
         });
       }
     } catch (error: unknown) {
-      const err = error as Error;
+      const err = error as {
+        status?: number;
+        message?: string;
+        response?: { status?: number; statusText?: string };
+      };
+      const status = err?.status || err?.response?.status;
+
+      if (status === 401) {
+        setDiagnostic({
+          status: "ERROR",
+          message: "Error HTTP 401: No autorizado (Token JWT ausente o expirado).",
+          details: "Inicia sesión nuevamente en el sistema.",
+        });
+        return;
+      }
+
+      if (status) {
+        setDiagnostic({
+          status: "ERROR",
+          message: `El backend respondió con un error HTTP ${status}: ${err?.response?.statusText || err?.message || ""}`,
+          details: "Verifica que el servicio esté activo en NestJS.",
+        });
+        return;
+      }
+
       setDiagnostic({
         status: "ERROR",
-        message: `No se pudo establecer conexión con ${API_BASE_URL}`,
-        details: `Detalle: ${err.message}`,
+        message: "No se pudo establecer conexión con la API",
+        details: `Detalle: ${err?.message || "Error de red"}`,
       });
     }
   }, []);
@@ -334,6 +335,36 @@ export default function CheckInPage() {
         const mappedResult = mapTicketToReceipt(createdTicket, resPlate || "RESERVA");
         openSuccessModalWithTicket(mappedResult, resPlate || "RESERVA");
         antMessage.success("¡Reserva validada y ticket generado con éxito!");
+        setReservationCode("");
+        return;
+      }
+
+      if (reservation.isSubscriptionPass) {
+        const subSpace =
+          (reservation as ReservationRecord & { parkingSpaceNumber?: string })
+            .parkingSpaceNumber ||
+          reservation.parkingSpace?.spaceNumber ||
+          (reservation as ReservationRecord & { parkingLotName?: string })
+            .parkingLotName ||
+          "N/A";
+        const subCode =
+          reservation.qrCode ?? reservation.qr_code ?? reservationCode.trim();
+        const subPlate = resPlate || "N/A";
+
+        openSuccessModalWithTicket(
+          {
+            ticketId: reservation.id || 0,
+            ticketNumber: subCode,
+            plateNumber: subPlate,
+            hasReservation: true,
+            assignedSpace: subSpace,
+            entryTime: new Date().toISOString(),
+            rateAmount: null,
+            isSubscription: true,
+          },
+          subPlate,
+        );
+        antMessage.success("¡Suscripción validada y ticket generado con éxito!");
         setReservationCode("");
         return;
       }
@@ -520,7 +551,7 @@ export default function CheckInPage() {
                 }}
               >
                 <Text strong style={{ color: "#166534", fontSize: "12px" }}>
-                  ✓ RECONOCIDO COMO CLIENTE FIJO / RESERVA: Acceso exento de pago a la salida.
+                  CLIENTE FIJO / RESERVA
                 </Text>
               </div>
             )}
@@ -533,6 +564,7 @@ export default function CheckInPage() {
                 plateNumberVal={ticketResult.plateNumber}
                 assignedSpaceVal={ticketResult.assignedSpace}
                 rateVal={ticketRate}
+                isSubscription={Boolean(ticketResult.isSubscription)}
                 dict={kioskDict}
               />
             )}

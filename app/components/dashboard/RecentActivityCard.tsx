@@ -32,9 +32,11 @@ const TICKET_STATUS_META: Record<
 };
 
 const LIST_SCROLL_STYLE: React.CSSProperties = {
-  maxHeight: "264px",
+  minHeight: "172px",
+  maxHeight: "172px",
   overflowY: "auto",
   paddingRight: "4px",
+  flex: 1,
 };
 
 interface RecentActivityCardProps {
@@ -56,11 +58,12 @@ export function RecentActivityCard({
           loading={loading}
           title={<span style={{ fontSize: 13 }}>Tickets Recientes</span>}
           style={{
+            height: "100%",
             borderRadius: "10px",
             border: "1px solid #e2e8f0",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
           }}
-          styles={{ body: { padding: "6px 14px" } }}
+          styles={{ body: { padding: "6px 14px", height: "100%", display: "flex", flexDirection: "column" } }}
         >
           <div style={LIST_SCROLL_STYLE}>
             <List
@@ -85,18 +88,18 @@ export function RecentActivityCard({
                 return (
                   <List.Item
                     style={{
-                      padding: "10px 0",
+                      padding: "6px 0",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: "12px",
+                      gap: "10px",
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "4px",
+                        gap: "2px",
                         minWidth: 0,
                       }}
                     >
@@ -107,7 +110,7 @@ export function RecentActivityCard({
                             margin: 0,
                             fontFamily: "monospace",
                             fontWeight: 700,
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: "#0f172a",
                             backgroundColor: "#f1f5f9",
                             borderColor: "#cbd5e1",
@@ -133,7 +136,7 @@ export function RecentActivityCard({
                       <Text
                         type="secondary"
                         style={{
-                          fontSize: 11.5,
+                          fontSize: 11,
                           display: "flex",
                           alignItems: "center",
                           gap: "5px",
@@ -150,7 +153,7 @@ export function RecentActivityCard({
                         margin: 0,
                         fontSize: 11,
                         fontWeight: 600,
-                        minWidth: "68px",
+                        minWidth: "64px",
                         textAlign: "center",
                         borderRadius: "6px",
                       }}
@@ -171,11 +174,12 @@ export function RecentActivityCard({
           loading={loading}
           title={<span style={{ fontSize: 13 }}>Últimos Cobros en Caja</span>}
           style={{
+            height: "100%",
             borderRadius: "10px",
             border: "1px solid #e2e8f0",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
           }}
-          styles={{ body: { padding: "6px 14px" } }}
+          styles={{ body: { padding: "6px 14px", height: "100%", display: "flex", flexDirection: "column" } }}
         >
           <div style={LIST_SCROLL_STYLE}>
             <List
@@ -197,29 +201,29 @@ export function RecentActivityCard({
                 return (
                   <List.Item
                     style={{
-                      padding: "10px 0",
+                      padding: "6px 0",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: "12px",
+                      gap: "10px",
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "4px",
+                        gap: "2px",
                         minWidth: 0,
                       }}
                     >
-                      <Text strong style={{ fontSize: 12.5, color: "#0f172a" }}>
+                      <Text strong style={{ fontSize: 12, color: "#0f172a" }}>
                         {origin}
                       </Text>
 
                       <Text
                         type="secondary"
                         style={{
-                          fontSize: 11.5,
+                          fontSize: 11,
                           display: "flex",
                           alignItems: "center",
                           gap: "5px",
@@ -235,7 +239,7 @@ export function RecentActivityCard({
                       strong
                       style={{
                         color: "#15803d",
-                        fontSize: 13,
+                        fontSize: 12.5,
                         whiteSpace: "nowrap",
                       }}
                     >

@@ -15,12 +15,13 @@ import {
   CarOutlined,
   FileDoneOutlined,
 } from "@ant-design/icons";
+import { validateReservationQr } from "@/app/lib/api/reservations";
+import {
+  SubscriptionsService,
+  type Subscription,
+} from "@/app/lib/api/subscriptions";
 
 const { Text } = Typography;
-
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
-).replace(/\/$/, "");
 
 export interface ReservationRecord {
   id: number;
@@ -31,6 +32,8 @@ export interface ReservationRecord {
   vehicle_plate_number?: string | null;
   parkingSpaceId?: number | string | null;
   parkingLotId?: number;
+  parkingLotName?: string;
+  parkingSpaceNumber?: string;
   startTime?: string;
   start_time?: string;
   endTime?: string;
@@ -41,6 +44,7 @@ export interface ReservationRecord {
     floor?: {
       lot?: {
         id?: number;
+        name?: string;
       };
     };
   } | null;
@@ -93,66 +97,110 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function resolveSubscriptionMatch(
+  subs: Subscription[],
+  code: string,
+): Subscription | undefined {
+  const normalized = code.trim().toUpperCase();
+
+  const exactMatch = subs.find((sub) => {
+    const rec = sub as unknown as Record<string, unknown>;
+    const candidates = [
+      rec.qrCode,
+      rec.qr_code,
+      rec.code,
+      `SUB-${sub.id}`,
+      `SUB-QR-${sub.id}`,
+    ]
+      .filter((v) => v !== undefined && v !== null)
+      .map((v) => String(v).trim().toUpperCase());
+
+    return candidates.includes(normalized);
+  });
+
+  if (exactMatch) return exactMatch;
+
+  const trailingIdMatch = normalized.match(/(\d+)$/);
+  if (trailingIdMatch) {
+    const numericId = Number(trailingIdMatch[1]);
+    return subs.find((sub) => Number(sub.id) === numericId);
+  }
+
+  return undefined;
+}
+
+function formatSubscriptionLocation(sub: Subscription): string {
+  const spaceNum = sub.parkingSpace?.spaceNumber
+    ? `Espacio ${sub.parkingSpace.spaceNumber}`
+    : "";
+  const lotName = sub.rate?.parkingLot?.name || "";
+
+  if (spaceNum && lotName) return `${spaceNum} · ${lotName}`;
+  if (spaceNum) return spaceNum;
+  if (lotName) return lotName;
+  if (sub.parkingSpaceId) return `Espacio #${sub.parkingSpaceId}`;
+  return "N/A";
+}
+
 async function validateQrCodeRequest(rawCode: string): Promise<ReservationRecord> {
   const code = String(rawCode ?? "").trim();
 
   if (!code) {
-    throw new Error("Debes pegar o ingresar el código de reservación o suscripción.");
+    throw new Error(
+      "Debes pegar o ingresar el código de reservación o suscripción.",
+    );
   }
 
   if (code.toUpperCase().startsWith("SUB-")) {
+    const subs = await SubscriptionsService.findAll();
+    const matchedSub = resolveSubscriptionMatch(subs, code);
+
+    if (!matchedSub) {
+      throw new Error(
+        "No se encontró ninguna suscripción registrada con ese código QR.",
+      );
+    }
+
+    const firstPlate = matchedSub.plateNumbers
+      ? String(matchedSub.plateNumbers)
+          .split(",")
+          .map((p) => p.trim())
+          .find(Boolean) || null
+      : null;
+
+    const lotId = matchedSub.rate?.parkingLot?.id;
+    const lotName = matchedSub.rate?.parkingLot?.name;
+    const locationLabel = formatSubscriptionLocation(matchedSub);
+
     return {
-      id: 0,
+      id: matchedSub.id,
       qrCode: code,
       isSubscriptionPass: true,
-      parkingLotId: 1,
+      vehiclePlateNumber: firstPlate,
+      vehicle_plate_number: firstPlate,
+      parkingSpaceId:
+        matchedSub.parkingSpaceId ?? matchedSub.parkingSpace?.id ?? null,
+      parkingLotId: lotId,
+      parkingLotName: lotName,
+      parkingSpaceNumber: locationLabel,
+      startTime: matchedSub.startDate,
+      endTime: matchedSub.endDate,
+      parkingSpace: {
+        id: matchedSub.parkingSpace?.id,
+        spaceNumber: locationLabel,
+        floor: {
+          lot: {
+            id: lotId,
+            name: lotName,
+          },
+        },
+      },
     };
   }
 
-  const endpoint = `${API_BASE_URL}/reservations/validate-qr`;
-
-  let res: Response;
-  try {
-    res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ code }),
-    });
-  } catch (networkError: unknown) {
-    const detail = extractErrorMessage(
-      networkError,
-      "No se pudo conectar con el servidor de reservaciones.",
-    );
-    throw new Error(detail);
-  }
-
-  let payload: Record<string, unknown> | null = null;
-  try {
-    const rawText = await res.text();
-    payload = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : null;
-  } catch {
-    payload = null;
-  }
-
-  if (!res.ok) {
-    const rawMsg = payload?.message;
-    const serverMsg = Array.isArray(rawMsg)
-      ? rawMsg.map(String).filter(Boolean).join(", ")
-      : typeof rawMsg === "string"
-        ? rawMsg
-        : "";
-
-    throw new Error(
-      serverMsg || `No se pudo validar el código QR (HTTP ${res.status}).`,
-    );
-  }
-
-  const sourceData = (
-    payload && typeof payload === "object" && "data" in payload && payload.data
-      ? payload.data
-      : payload
-  ) as ReservationRecord | null;
+  const sourceData = (await validateReservationQr(
+    code,
+  )) as ReservationRecord | null;
 
   if (!sourceData || typeof sourceData !== "object") {
     throw new Error("La respuesta de validación de reserva no es válida.");
@@ -211,14 +259,29 @@ export default function ReservationQrScanner({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        width: "100%",
+      }}
+    >
       {setEntryType && (
         <Segmented
           block
           size="large"
           options={[
-            { label: "Sin Reservación (Directo)", value: "SIN_RESERVACION", icon: <CarOutlined /> },
-            { label: "Con Reservación", value: "CON_RESERVACION", icon: <BarcodeOutlined /> },
+            {
+              label: "Sin Reservación (Directo)",
+              value: "SIN_RESERVACION",
+              icon: <CarOutlined />,
+            },
+            {
+              label: "Con Reservación",
+              value: "CON_RESERVACION",
+              icon: <BarcodeOutlined />,
+            },
           ]}
           value={entryType}
           onChange={(val) => {
@@ -232,7 +295,11 @@ export default function ReservationQrScanner({
 
       <Form layout="vertical" requiredMark={false}>
         <Form.Item
-          label={<Text strong style={{ color: "#334155" }}>Código de Reservación / Suscripción (QR)</Text>}
+          label={
+            <Text strong style={{ color: "#334155" }}>
+              Código de Reservación / Suscripción (QR)
+            </Text>
+          }
           style={{ marginBottom: "12px" }}
         >
           <Input
@@ -241,7 +308,11 @@ export default function ReservationQrScanner({
             placeholder="Pegar código ej.: RES-QR-... o SUB-QR-..."
             value={reservationCode}
             onChange={(e) => setReservationCode(e.target.value.trim())}
-            style={{ width: "100%", borderRadius: "8px", fontFamily: "monospace" }}
+            style={{
+              width: "100%",
+              borderRadius: "8px",
+              fontFamily: "monospace",
+            }}
             prefix={<BarcodeOutlined style={{ color: "#0284c7" }} />}
           />
         </Form.Item>

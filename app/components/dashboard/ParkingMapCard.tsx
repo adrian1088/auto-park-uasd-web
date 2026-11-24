@@ -14,89 +14,82 @@ import {
   Typography,
 } from "antd";
 import {
-  BarChartOutlined,
   CarFilled,
   CheckCircleFilled,
   CloseCircleFilled,
   EnvironmentOutlined,
   TagFilled,
 } from "@ant-design/icons";
+import { http } from "@/app/lib/http";
+import type { ApiResponseList } from "@/app/lib/api/base";
+import { getParkingLots, type ParkingLot } from "@/app/lib/api/lots";
+import {
+  getParkingSpaces,
+  type ParkingSpace,
+} from "@/app/lib/api/spaces";
+import type { ParkingFloor } from "@/app/lib/api/floors";
 
 const { Text } = Typography;
 
-interface ParkingLot {
-  id: string | number;
-  name: string;
-}
-
-interface ParkingFloor {
-  id: string | number;
-  floorNumber: number;
-}
-
-interface ParkingSpaceItem {
-  id: string | number;
-  spaceNumber: string;
-  type: string;
-  status: string;
-  floor?: {
-    id: string | number;
-    floorNumber: number;
-    lot?: {
-      id: string | number;
-      name: string;
-    };
-  };
-}
-
 export interface ParkingMapCardProps {
   refreshTrigger: number;
+  selectedLot?: number | "ALL";
 }
 
-export function ParkingMapCard({ refreshTrigger }: ParkingMapCardProps) {
+export function ParkingMapCard({
+  refreshTrigger,
+  selectedLot,
+}: ParkingMapCardProps) {
   const [viewMode, setViewMode] = useState<"MAP" | "CHART">("MAP");
 
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [floors, setFloors] = useState<ParkingFloor[]>([]);
-  const [spaces, setSpaces] = useState<ParkingSpaceItem[]>([]);
+  const [spaces, setSpaces] = useState<ParkingSpace[]>([]);
 
-  const [selectedLotId, setSelectedLotId] = useState<string | number>(1);
-  const [selectedFloorId, setSelectedFloorId] = useState<
-    string | number | undefined
-  >(undefined);
+  const [localLotId, setLocalLotId] = useState<number | undefined>(undefined);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | undefined>(
+    undefined,
+  );
 
   const [loading, startTransition] = useTransition();
 
+  const isAllMode = selectedLot === "ALL";
+  const effectiveLotId: number | undefined = isAllMode
+    ? localLotId
+    : typeof selectedLot === "number"
+      ? selectedLot
+      : undefined;
+
   const fetchLots = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:3001/api/v1/parking/lots", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const lotsList = Array.isArray(result) ? result : result?.data || [];
-        setLots(lotsList);
+      const lotsRes = await getParkingLots();
+      const lotsList = Array.isArray(lotsRes) ? lotsRes : [];
+      setLots(lotsList);
+      if (lotsList.length > 0) {
+        setLocalLotId((prev) => {
+          const exists = lotsList.some((l) => Number(l.id) === Number(prev));
+          return exists ? prev : Number(lotsList[0].id);
+        });
       }
     } catch (error) {
       console.error("Error al cargar los lotes:", error);
     }
   }, []);
 
-  const fetchFloors = useCallback(async (lotId: string | number) => {
+  const fetchFloors = useCallback(async (lotId?: number) => {
     try {
-      const res = await fetch(
-        `http://localhost:3001/api/v1/parking/floors?lotId=${lotId}`,
-        { credentials: "include" },
+      const response = await http.get<ApiResponseList<ParkingFloor>>(
+        "/parking/floors",
+        {
+          query: lotId !== undefined ? { lotId } : undefined,
+        },
       );
-      if (res.ok) {
-        const result = await res.json();
-        const floorsList = Array.isArray(result) ? result : result?.data || [];
-        setFloors(floorsList);
-        if (floorsList.length > 0) {
-          setSelectedFloorId(floorsList[0].id);
-        } else {
-          setSelectedFloorId(undefined);
-        }
+      const floorsList = Array.isArray(response?.data) ? response.data : [];
+      setFloors(floorsList);
+      if (floorsList.length > 0) {
+        setSelectedFloorId(Number(floorsList[0].id));
+      } else {
+        setSelectedFloorId(undefined);
       }
     } catch (error) {
       console.error("Error al cargar los pisos:", error);
@@ -104,20 +97,11 @@ export function ParkingMapCard({ refreshTrigger }: ParkingMapCardProps) {
   }, []);
 
   const fetchSpaces = useCallback(
-    async (lotId: string | number, floorId?: string | number) => {
+    async (lotId?: number, floorId?: number) => {
       try {
-        let url = `http://localhost:3001/api/v1/parking/spaces?lotId=${lotId}`;
-        if (floorId) {
-          url += `&floorId=${floorId}`;
-        }
-        const res = await fetch(url, { credentials: "include" });
-        if (res.ok) {
-          const result = await res.json();
-          const spacesList: ParkingSpaceItem[] = Array.isArray(result)
-            ? result
-            : result?.data || [];
-          setSpaces(spacesList);
-        }
+        const spacesRes = await getParkingSpaces(lotId, floorId);
+        const spacesList = Array.isArray(spacesRes) ? spacesRes : [];
+        setSpaces(spacesList);
       } catch (error) {
         console.error("Error al cargar los espacios:", error);
       }
@@ -126,26 +110,24 @@ export function ParkingMapCard({ refreshTrigger }: ParkingMapCardProps) {
   );
 
   useEffect(() => {
+    if (isAllMode) {
+      startTransition(() => {
+        void fetchLots();
+      });
+    }
+  }, [isAllMode, fetchLots]);
+
+  useEffect(() => {
     startTransition(() => {
-      void fetchLots();
+      void fetchFloors(effectiveLotId);
     });
-  }, [fetchLots]);
+  }, [effectiveLotId, fetchFloors]);
 
   useEffect(() => {
-    if (selectedLotId) {
-      startTransition(() => {
-        void fetchFloors(selectedLotId);
-      });
-    }
-  }, [selectedLotId, fetchFloors]);
-
-  useEffect(() => {
-    if (selectedLotId) {
-      startTransition(() => {
-        void fetchSpaces(selectedLotId, selectedFloorId);
-      });
-    }
-  }, [selectedLotId, selectedFloorId, refreshTrigger, fetchSpaces]);
+    startTransition(() => {
+      void fetchSpaces(effectiveLotId, selectedFloorId);
+    });
+  }, [effectiveLotId, selectedFloorId, refreshTrigger, fetchSpaces]);
 
   const freeCount = spaces.filter(
     (s) => String(s.status || "").trim().toUpperCase() === "FREE",
@@ -207,12 +189,10 @@ export function ParkingMapCard({ refreshTrigger }: ParkingMapCardProps) {
                 {
                   label: "Mapa",
                   value: "MAP",
-                  icon: <EnvironmentOutlined />,
                 },
                 {
-                  label: "Gráfico",
+                  label: "Ocupación",
                   value: "CHART",
-                  icon: <BarChartOutlined />,
                 },
               ]}
             />
@@ -221,23 +201,25 @@ export function ParkingMapCard({ refreshTrigger }: ParkingMapCardProps) {
       }
     >
       <Flex gap={8} style={{ marginBottom: 30 }}>
+        {isAllMode && (
+          <Select
+            size="small"
+            style={{ width: "60%" }}
+            placeholder="Seleccionar Lote"
+            value={localLotId}
+            onChange={(value) => setLocalLotId(Number(value))}
+            options={lots.map((l) => ({ label: l.name, value: Number(l.id) }))}
+          />
+        )}
         <Select
           size="small"
-          style={{ width: "60%" }}
-          placeholder="Seleccionar Lote"
-          value={selectedLotId}
-          onChange={(value) => setSelectedLotId(value)}
-          options={lots.map((l) => ({ label: l.name, value: l.id }))}
-        />
-        <Select
-          size="small"
-          style={{ width: "40%" }}
+          style={{ width: isAllMode ? "40%" : "100%" }}
           placeholder="Seleccionar Piso"
           value={selectedFloorId}
-          onChange={(value) => setSelectedFloorId(value)}
+          onChange={(value) => setSelectedFloorId(Number(value))}
           options={floors.map((f) => ({
             label: `Piso ${f.floorNumber}`,
-            value: f.id,
+            value: Number(f.id),
           }))}
           disabled={floors.length === 0}
         />

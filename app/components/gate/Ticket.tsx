@@ -11,6 +11,7 @@ interface KioskTicketProps {
   plateNumberVal?: string;
   assignedSpaceVal?: string;
   rateVal?: string | number | null;
+  isSubscription?: boolean;
   dict: {
     printingTicket: string;
     takeTicket: string;
@@ -46,6 +47,7 @@ export default function KioskTicket({
   plateNumberVal = "N/A",
   assignedSpaceVal = "N/A",
   rateVal,
+  isSubscription = false,
   dict,
 }: KioskTicketProps) {
   return (
@@ -157,7 +159,7 @@ export default function KioskTicket({
               color: "#0f172a",
             }}
           >
-            AUTOPARK<span style={{ color: "#0284c7" }}>.AI</span>
+            AUTOPARK<span style={{ color: "#0284c7" }}>.UASD</span>
           </span>
 
           <p
@@ -211,15 +213,17 @@ export default function KioskTicket({
             </span>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-            <span style={{ color: "#94a3b8" }}>
-              {dict.rateLabel}
-            </span>
+          {!isSubscription && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+              <span style={{ color: "#94a3b8" }}>
+                {dict.rateLabel}
+              </span>
 
-            <span style={{ textAlign: "right" }}>
-              {formatRateLabel(rateVal)}
-            </span>
-          </div>
+              <span style={{ textAlign: "right" }}>
+                {formatRateLabel(rateVal)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Código QR */}
