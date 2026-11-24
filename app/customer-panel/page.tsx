@@ -1,7 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import { Button, Typography, Space } from "antd";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  Component,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+import { Button, Typography, Space, Segmented } from "antd";
 import {
   EnvironmentOutlined,
   GlobalOutlined,
@@ -10,22 +17,146 @@ import {
   PhoneOutlined,
   LoadingOutlined,
   CheckCircleOutlined,
+  CarOutlined,
+  QrcodeOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import QRCode from "qrcode";
 
 import KioskInitial from "./components/Initial";
 import KioskScanner from "./components/Lpr";
-import KioskTicket from "./components/Ticket";
-import KioskSuccess from "./components/Success";
+import KioskTicket from "../components/gate/Ticket";
+import KioskSuccess from "../components/gate/Success";
+import ReservationQrScanner, {
+  type ReservationRecord,
+} from "../components/gate/ReservationQrScanner";
 
-import { processGateEntry } from "@/app/lib/api/gate";
+import { getValidPlates, processGateEntry } from "@/app/lib/api/gate";
+import { checkInTicket, type Ticket } from "@/app/lib/api/tickets";
 
 import "./page.css";
 
 const { Title, Text } = Typography;
 
+const DEFAULT_PLATES = ["A-312-XYZ", "B-214-ABC", "C-923-ZZZ", "D-216-WWW", "E-581-QQQ"];
+const DEFAULT_LOT_ID = 1;
+
+const TRANSLATIONS = {
+  es: {
+    barrierOpen: "BARRERA ABIERTA",
+    getTicket: "OBTENER TICKET",
+    pressTicket: "TOCAR AQUÍ",
+    approachVehicle: "Acerque su vehículo a la barra de contención para lectura automática",
+    plateRecognition: "RECONOCIMIENTO DE MATRÍCULA",
+    scanning: "LEYENDO PLACA LPR...",
+    printingTicket: "Imprimiendo ticket…",
+    takeTicket: "RETIRE SU TICKET TÉRMICO",
+    ticketInstruction: "Por favor tome el boleto impreso en el slot inferior",
+    parkingReceipt: "Comprobante de Estacionamiento",
+    plateLabel: "MATRÍCULA:",
+    dateTimeLabel: "FECHA / HORA:",
+    locationLabel: "UBICACIÓN:",
+    rateLabel: "TARIFA:",
+    barrierOpenTitle: "¡BARRERA ABIERTA!",
+    driveCarefully: "AVANCE CON PRECAUCIÓN HASTA SU ESPACIO ASIGNADO",
+    closingIn: "Cierre automático en:",
+    needHelp: "¿Necesita asistencia personal?",
+    pressSupport: "Presione el botón de soporte",
+    assistance: "Asistencia",
+    calling: "LLAMANDO...",
+    connected: "OPERADOR CONECTADO",
+  },
+  en: {
+    barrierOpen: "GATE OPEN",
+    getTicket: "GET TICKET",
+    pressTicket: "PRESS FOR TICKET • TAP HERE",
+    approachVehicle: "Move your vehicle close to the barrier for automatic recognition",
+    plateRecognition: "LICENSE PLATE RECOGNITION",
+    scanning: "SCANNING PLATE...",
+    printingTicket: "Printing ticket…",
+    takeTicket: "TAKE YOUR THERMAL TICKET",
+    ticketInstruction: "Please take the printed ticket from the lower slot",
+    parkingReceipt: "Parking Receipt",
+    plateLabel: "LICENSE PLATE:",
+    dateTimeLabel: "DATE / TIME:",
+    locationLabel: "LOCATION:",
+    rateLabel: "RATE:",
+    barrierOpenTitle: "GATE OPEN!",
+    driveCarefully: "PROCEED CAREFULLY TO YOUR ASSIGNED SPACE",
+    closingIn: "Auto-closing in:",
+    needHelp: "Do you need personal assistance?",
+    pressSupport: "Press the support button",
+    assistance: "Assistance",
+    calling: "CALLING...",
+    connected: "OPERATOR CONNECTED",
+  },
+} as const;
+
+type TicketExt = Ticket & {
+  rate_amount?: number | string | null;
+  rate?: { amount?: number | string | null } | null;
+};
+
+class AreaErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string; onReset: () => void },
+  { message: string | null }
+> {
+  state = { message: null as string | null };
+
+  static getDerivedStateFromError(err: unknown) {
+    return { message: err instanceof Error ? err.message : String(err) };
+  }
+
+  componentDidCatch(err: unknown, info: ErrorInfo) {
+    console.error("[KioskAreaError]", err, info.componentStack);
+  }
+
+  componentDidUpdate(prevProps: { resetKey: string }) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.message) {
+      this.setState({ message: null });
+    }
+  }
+
+  render() {
+    if (this.state.message) {
+      return (
+        <div style={{ textAlign: "center", padding: 16 }}>
+          <Text type="danger" style={{ display: "block", marginBottom: 10 }}>
+            {this.state.message}
+          </Text>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              this.setState({ message: null });
+              this.props.onReset();
+            }}
+          >
+            Reiniciar
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const getErrMsg = (err: unknown): string => {
+  if (!err) return "Error desconocido";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  const o = err as { message?: unknown; body?: { message?: unknown }; data?: { message?: unknown } };
+  const raw = o.body?.message ?? o.data?.message ?? o.message ?? err;
+  return Array.isArray(raw) ? raw.join(", ") : String(raw);
+};
+
 export default function CustomerPanelPage() {
-  const [currentLanguage, setCurrentLanguage] = useState<"es" | "en">("es");
+  const [lang, setLang] = useState<"es" | "en">("es");
+  const [entryType, setEntryType] = useState<"SIN_RESERVACION" | "CON_RESERVACION">("SIN_RESERVACION");
+  const [reservationCode, setReservationCode] = useState("");
+  const [reservationLoading, setReservationLoading] = useState(false);
+
   const [liveTime, setLiveTime] = useState("12:00:00");
   const [liveDate, setLiveDate] = useState("martes, 20 de octubre de 2026");
 
@@ -33,8 +164,10 @@ export default function CustomerPanelPage() {
   const [lprSubtitle, setLprSubtitle] = useState("Procesando imagen LPR en tiempo real…");
   const [ticketTimeVal, setTicketTimeVal] = useState("20/10/26 12:00");
   const [ticketCodeVal, setTicketCodeVal] = useState("TK-89421094");
-  const [scannedPlate, setScannedPlate] = useState("A-892-XYZ");
-  const [assignedSpaceVal, setAssignedSpaceVal] = useState("P1 • A-12");
+  const [scannedPlate, setScannedPlate] = useState(DEFAULT_PLATES[0]);
+  const [assignedSpaceVal, setAssignedSpaceVal] = useState("N/A");
+  const [ticketRateVal, setTicketRateVal] = useState<number | string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [countdown, setCountdown] = useState(5);
   const [supportLoading, setSupportLoading] = useState(false);
@@ -42,210 +175,166 @@ export default function CustomerPanelPage() {
 
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const flowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
-  const translations = {
-    es: {
-      barrierOpen: "BARRERA ABIERTA",
-      getTicket: "OBTENER TICKET",
-      pressTicket: "TOCAR AQUÍ",
-      approachVehicle: "Acerque su vehículo a la barra de contención para lectura automática",
-      plateRecognition: "RECONOCIMIENTO DE MATRÍCULA",
-      scanning: "ESCANEANDO MATRÍCULA...",
-      printingTicket: "Imprimiendo ticket…",
-      takeTicket: "RETIRE SU TICKET TÉRMICO",
-      ticketInstruction: "Por favor tome el boleto impreso en el slot inferior",
-      parkingReceipt: "Comprobante de Estacionamiento",
-      plateLabel: "MATRÍCULA:",
-      dateTimeLabel: "FECHA / HORA:",
-      locationLabel: "UBICACIÓN:",
-      rateLabel: "TARIFA:",
-      barrierOpenTitle: "¡BARRERA ABIERTA!",
-      driveCarefully: "AVANCE CON PRECAUCIÓN HASTA SU ESPACIO ASIGNADO",
-      closingIn: "Cierre automático en:",
-      needHelp: "¿Necesita asistencia personal?",
-      pressSupport: "Presione el botón de soporte",
-      assistance: "Asistencia",
-      calling: "LLAMANDO...",
-      connected: "OPERADOR CONECTADO",
-    },
-    en: {
-      barrierOpen: "GATE OPEN",
-      getTicket: "GET TICKET",
-      pressTicket: "PRESS FOR TICKET • TAP HERE",
-      approachVehicle: "Move your vehicle close to the barrier for automatic recognition",
-      plateRecognition: "LICENSE PLATE RECOGNITION",
-      scanning: "SCANNING PLATE...",
-      printingTicket: "Printing ticket…",
-      takeTicket: "TAKE YOUR THERMAL TICKET",
-      ticketInstruction: "Please take the printed ticket from the lower slot",
-      parkingReceipt: "Parking Receipt",
-      plateLabel: "LICENSE PLATE:",
-      dateTimeLabel: "DATE / TIME:",
-      locationLabel: "LOCATION:",
-      rateLabel: "RATE:",
-      barrierOpenTitle: "GATE OPEN!",
-      driveCarefully: "PROCEED CAREFULLY TO YOUR ASSIGNED SPACE",
-      closingIn: "Auto-closing in:",
-      needHelp: "Do you need personal assistance?",
-      pressSupport: "Press the support button",
-      assistance: "Assistance",
-      calling: "CALLING...",
-      connected: "OPERATOR CONNECTED",
-    },
-  };
+  const dict = TRANSLATIONS[lang];
 
-  const dict = translations[currentLanguage];
-
-  const toggleLanguage = () => {
-    setCurrentLanguage((prev) => (prev === "es" ? "en" : "es"));
-  };
-
-  const playScanSound = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.6);
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 1.2);
-
-      gain.gain.setValueAtTime(0.01, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.2);
-      gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 1.4);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 1.4);
-    } catch (e: unknown) {
-      console.log("Audio no soportado o bloqueado", e);
-    }
+  const clearTimers = () => {
+    if (flowTimeoutRef.current) clearTimeout(flowTimeoutRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    flowTimeoutRef.current = null;
+    countdownRef.current = null;
   };
 
   useEffect(() => {
-    const updateClock = () => {
+    const tick = () => {
       const now = new Date();
-      const locale = currentLanguage === "en" ? "en-US" : "es-DO";
-      setLiveTime(
-        now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
-      );
-      setLiveDate(
-        now.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-      );
+      const loc = lang === "en" ? "en-US" : "es-DO";
+      setLiveTime(now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }));
+      setLiveDate(now.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
     };
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, [currentLanguage]);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lang]);
 
   useEffect(() => {
-    if (step === "ticket" && qrCanvasRef.current) {
-      const safeCode = ticketCodeVal || "TCK-000";
-      const safePlate = scannedPlate || "A-892-XYZ";
-      const safeTime = ticketTimeVal || "20/10/26 12:00";
-      const safeSpace = assignedSpaceVal || "GENERAL";
-
-      const qrPayload = `AUTOPARK|${safeCode}|${safePlate}|${safeTime}|${safeSpace}`;
-      console.log("Generando QR en Kiosco:", qrPayload);
-
+    if (step !== "ticket") return;
+    const frame = requestAnimationFrame(() => {
+      if (!qrCanvasRef.current) return;
       QRCode.toCanvas(
         qrCanvasRef.current,
-        qrPayload,
-        { width: 76, margin: 0, color: { dark: "#0f172a", light: "#ffffff" } },
+        `AUTOPARK|${ticketCodeVal}|${scannedPlate}|${ticketTimeVal}|${assignedSpaceVal}`,
+        { width: 84, margin: 0, color: { dark: "#0f172a", light: "#ffffff" } },
         (error: Error | null | undefined) => {
-          if (error) console.error("Error generando QR:", error);
-        }
+          if (error) setErrorMsg(error.message);
+        },
       );
-    }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [step, ticketCodeVal, scannedPlate, ticketTimeVal, assignedSpaceVal]);
 
   useEffect(() => {
-    if (step === "open") {
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-            setStep("initial");
-            return 5;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (step !== "open") return;
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          setStep("initial");
+          setEntryType("SIN_RESERVACION");
+          return 5;
+        }
+        return c - 1;
+      });
+    }, 1000);
     return () => {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [step]);
 
+  useEffect(() => () => clearTimers(), []);
+
+  const openTicketThenGate = (data: {
+    plate: string;
+    code: string;
+    space: string;
+    entryTime?: string;
+    rate?: number | string | null;
+  }) => {
+    clearTimers();
+    setErrorMsg(null);
+    const d = new Date(data.entryTime || Date.now());
+    const valid = Number.isNaN(d.getTime()) ? new Date() : d;
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    setScannedPlate(data.plate || DEFAULT_PLATES[0]);
+    setTicketTimeVal(`${pad(valid.getDate())}/${pad(valid.getMonth() + 1)}/${String(valid.getFullYear()).slice(-2)} ${pad(valid.getHours())}:${pad(valid.getMinutes())}`);
+    setTicketCodeVal(data.code || `TCK-${Date.now()}`);
+    setAssignedSpaceVal(data.space || "N/A");
+    setTicketRateVal(data.rate ?? null);
+    setStep("ticket");
+
+    flowTimeoutRef.current = setTimeout(() => {
+      setCountdown(5);
+      setStep("open");
+    }, 3500);
+  };
+
   const startTicketFlow = async () => {
+    clearTimers();
+    setErrorMsg(null);
+    setLprSubtitle(lang === "en" ? "Processing LPR image in real time…" : "Procesando imagen LPR en tiempo real…");
     setStep("lpr");
-    playScanSound();
-    setLprSubtitle(currentLanguage === "en" ? "Processing LPR image in real time…" : "Procesando imagen LPR en tiempo real…");
 
     try {
-      const ticketData = await processGateEntry("AUTO");
+      const plates = await getValidPlates();
+      const plate = plates[Math.floor(Math.random() * plates.length)] || DEFAULT_PLATES[0];
+      setScannedPlate(plate);
+      await wait(1000);
+      setLprSubtitle(lang === "en" ? `Plate verified: ${plate}` : `¡Matrícula Verificada: ${plate}!`);
 
-      if (!ticketData) {
-        throw new Error("No se pudo obtener una respuesta válida del sistema de acceso.");
+      const ticket = (await checkInTicket({ plateNumber: plate, parkingLotId: DEFAULT_LOT_ID })) as TicketExt;
+      await wait(900);
+
+      openTicketThenGate({
+        plate: ticket.vehiclePlateNumber || ticket.plateNumber || plate,
+        code: ticket.code,
+        space: ticket.spot?.spaceNumber || ticket.spaceNumber || ticket.spotNumber || "N/A",
+        entryTime: ticket.entranceAt,
+        rate: ticket.rateAmount ?? ticket.rate_amount ?? ticket.rate?.amount ?? null,
+      });
+    } catch (err) {
+      const msg = getErrMsg(err);
+      console.error("[Kiosk sin reserva]", err);
+      setErrorMsg(msg);
+      setLprSubtitle(msg);
+      flowTimeoutRef.current = setTimeout(() => setStep("initial"), 3000);
+    }
+  };
+
+  const handleReservationResolved = async (res: ReservationRecord) => {
+    if (reservationLoading) return;
+    setReservationLoading(true);
+    setErrorMsg(null);
+    try {
+      const plate = String(res.vehiclePlateNumber ?? res.vehicle_plate_number ?? "").trim().toUpperCase();
+      const resId = Number(res.id);
+
+      if (!res.isSubscriptionPass && Number.isInteger(resId) && resId > 0) {
+        const ticket = (await checkInTicket({ reservationId: resId })) as TicketExt;
+        openTicketThenGate({
+          plate: ticket.vehiclePlateNumber || plate || DEFAULT_PLATES[0],
+          code: ticket.code,
+          space: ticket.spot?.spaceNumber || ticket.spaceNumber || "N/A",
+          entryTime: ticket.entranceAt,
+          rate: ticket.rateAmount ?? ticket.rate_amount ?? ticket.rate?.amount ?? null,
+        });
+        setReservationCode("");
+        return;
       }
 
-      // Blindaje contra "S/N" o placas vacías usando respaldos realistas
-      const fallbackPlates = ["A-892-XYZ", "B-114-AlC", "C-333-ZZZ", "D-456-WWW", "E-789-QQQ"];
-      const randomFallback = fallbackPlates[Math.floor(Math.random() * fallbackPlates.length)];
-      
-      const chosenPlate = ticketData.plateNumber && ticketData.plateNumber !== "S/N" 
-        ? ticketData.plateNumber 
-        : randomFallback;
+      const gate = await processGateEntry(
+        plate || "AUTO",
+        DEFAULT_LOT_ID,
+        "MANUAL",
+        res.qrCode ?? res.qr_code ?? reservationCode.trim(),
+      );
+      if (!gate) throw new Error("Sin respuesta de garita.");
 
-      setScannedPlate(chosenPlate);
-
-      await new Promise((resolve) => setTimeout(resolve, 1800));
-      
-      setLprSubtitle(currentLanguage === "en" ? `Plate verified: ${chosenPlate}` : `¡Matrícula Verificada: ${chosenPlate}!`);
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setStep("ticket");
-      
-      const entryDate = new Date(ticketData.entryTime || Date.now());
-      const hours = String(entryDate.getHours()).padStart(2, "0");
-      const mins = String(entryDate.getMinutes()).padStart(2, "0");
-      const day = String(entryDate.getDate()).padStart(2, "0");
-      const month = String(entryDate.getMonth() + 1).padStart(2, "0");
-      const year = String(entryDate.getFullYear()).slice(-2);
-
-      setTicketTimeVal(`${day}/${month}/${year} ${hours}:${mins}`);
-      setTicketCodeVal(ticketData.ticketNumber || `TCK-${Date.now()}`);
-      setAssignedSpaceVal(ticketData.assignedSpace || "P1 • A-12");
-
-      flowTimeoutRef.current = setTimeout(() => {
-        setCountdown(5);
-        setStep("open");
-      }, 2500);
-
-    } catch (error: unknown) {
-      const err = error as { status?: number; message?: string; data?: { message?: string } };
-      const serverMessage = err.data?.message || err.message || "";
-      console.error("Error en flujo de Kiosco:", error);
-
-      if (
-        serverMessage.toLowerCase().includes("espacio") || 
-        serverMessage.toLowerCase().includes("lleno") || 
-        serverMessage.toLowerCase().includes("activo") ||
-        serverMessage.toLowerCase().includes("bad request")
-      ) {
-        setLprSubtitle(currentLanguage === "en" ? "Parking is full or vehicle already inside." : "Estacionamiento lleno o vehículo con ticket activo.");
-      } else {
-        setLprSubtitle(serverMessage || "Error al procesar el acceso en el Kiosco.");
-      }
-
-      setTimeout(() => setStep("initial"), 3500);
+      openTicketThenGate({
+        plate: gate.plateNumber || plate || DEFAULT_PLATES[0],
+        code: gate.ticketNumber,
+        space: gate.assignedSpace || "N/A",
+        entryTime: gate.entryTime,
+        rate: gate.rateAmount ?? gate.rate_amount ?? null,
+      });
+      setReservationCode("");
+    } catch (err) {
+      setErrorMsg(getErrMsg(err));
+      throw err;
+    } finally {
+      setReservationLoading(false);
     }
   };
 
@@ -259,29 +348,31 @@ export default function CustomerPanelPage() {
   };
 
   return (
-    <div className="kiosk-container">
-      {/* HEADER */}
-      <header className="kiosk-header">
+    <div
+      className="kiosk-container"
+      style={{
+        height: "100dvh",
+        maxHeight: "100vh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: "8px 20px 10px",
+        boxSizing: "border-box",
+      }}
+    >
+      <header className="kiosk-header" style={{ marginBottom: 0, padding: "6px 16px" }}>
         <div className="kiosk-header-left">
-          <div>
-            <Title level={4} className="kiosk-title">
-              AUTOPARK
-            </Title>
-            <Text type="secondary" className="kiosk-subtitle">
-              <EnvironmentOutlined /> Terminal Principal • Acceso Norte
-            </Text>
-          </div>
+          <Title level={4} className="kiosk-title" style={{ margin: 0 }}>AUTOPARK</Title>
+          <Text type="secondary" className="kiosk-subtitle">
+            <EnvironmentOutlined /> Terminal Principal • Acceso Norte
+          </Text>
         </div>
 
-        <Space size={18}>
-          <Button
-            onClick={toggleLanguage}
-            icon={<GlobalOutlined className="kiosk-lang-icon" />}
-            className="kiosk-lang-btn"
-          >
-            {currentLanguage.toUpperCase()} <DownOutlined className="kiosk-lang-arrow" />
+        <Space size={14}>
+          <Button onClick={() => setLang((l) => (l === "es" ? "en" : "es"))} icon={<GlobalOutlined className="kiosk-lang-icon" />} className="kiosk-lang-btn">
+            {lang.toUpperCase()} <DownOutlined className="kiosk-lang-arrow" />
           </Button>
-
           <div className="kiosk-clock-container">
             <div className="kiosk-clock-wrapper">
               <span className="kiosk-date-text">{liveDate}</span>
@@ -291,27 +382,95 @@ export default function CustomerPanelPage() {
         </Space>
       </header>
 
-      {/* CONTENIDO CENTRAL */}
-      <main className="kiosk-main">
-        {step === "initial" && <KioskInitial onGetTicket={startTicketFlow} dict={dict} />}
-        {step === "lpr" && <KioskScanner lprSubtitle={lprSubtitle} detectedPlate={scannedPlate} dict={dict} />}
-        {step === "ticket" && (
-          <KioskTicket 
-            qrCanvasRef={qrCanvasRef} 
-            ticketTimeVal={ticketTimeVal} 
-            ticketCodeVal={ticketCodeVal} 
-            dict={dict} 
-          />
-        )}
-        {step === "open" && <KioskSuccess countdown={countdown} dict={dict} />}
+      <div style={{ display: "flex", justifyContent: "center", margin: "6px 0 2px", flexShrink: 0 }}>
+        <Segmented
+          size="large"
+          value={entryType}
+          onChange={(val) => {
+            clearTimers();
+            setErrorMsg(null);
+            setEntryType(val as "SIN_RESERVACION" | "CON_RESERVACION");
+            setStep("initial");
+          }}
+          options={[
+            { label: <Space size={6}><CarOutlined /><span>Sin Reserva</span></Space>, value: "SIN_RESERVACION" },
+            { label: <Space size={6}><QrcodeOutlined /><span>Con Reserva</span></Space>, value: "CON_RESERVACION" },
+          ]}
+        />
+      </div>
+
+      <main
+        className="kiosk-main"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4px 0 8px",
+          overflow: "hidden",
+        }}
+      >
+        <AreaErrorBoundary
+          resetKey={`${step}-${entryType}-${ticketCodeVal}`}
+          onReset={() => {
+            clearTimers();
+            setErrorMsg(null);
+            setStep("initial");
+          }}
+        >
+          {step === "initial" && entryType === "SIN_RESERVACION" && (
+            <KioskInitial onGetTicket={startTicketFlow} dict={dict} />
+          )}
+
+          {step === "initial" && entryType === "CON_RESERVACION" && (
+            <div style={{ width: "100%", maxWidth: 680, background: "#fff", borderRadius: 20, padding: "20px 24px", border: "1px solid #e2e8f0" }}>
+              <ReservationQrScanner
+                entryType={entryType}
+                setEntryType={(val) => {
+                  clearTimers();
+                  setEntryType(val);
+                  setStep("initial");
+                }}
+                reservationCode={reservationCode}
+                setReservationCode={setReservationCode}
+                onResolved={handleReservationResolved}
+                loading={reservationLoading}
+              />
+            </div>
+          )}
+
+          {step === "lpr" && (
+            <KioskScanner key={scannedPlate} lprSubtitle={lprSubtitle} detectedPlate={scannedPlate} dict={dict} />
+          )}
+
+          {step === "ticket" && (
+            <KioskTicket
+              qrCanvasRef={qrCanvasRef}
+              ticketTimeVal={ticketTimeVal}
+              ticketCodeVal={ticketCodeVal}
+              plateNumberVal={scannedPlate}
+              assignedSpaceVal={assignedSpaceVal}
+              rateVal={ticketRateVal}
+              dict={dict}
+            />
+          )}
+
+          {step === "open" && <KioskSuccess countdown={countdown} dict={dict} />}
+
+          {errorMsg && (
+            <Text type="danger" style={{ fontSize: 12, marginTop: 6 }}>
+              {errorMsg}
+            </Text>
+          )}
+        </AreaErrorBoundary>
       </main>
 
-      {/* FOOTER */}
-      <footer className="kiosk-footer">
+      <footer className="kiosk-footer" style={{ marginTop: 0, padding: "6px 16px" }}>
         <Space size={12}>
-          <div className="kiosk-footer-icon-box">
-            <CustomerServiceOutlined />
-          </div>
+          <div className="kiosk-footer-icon-box"><CustomerServiceOutlined /></div>
           <div>
             <Text strong className="kiosk-footer-title">{dict.needHelp}</Text>
             <Text type="secondary" className="kiosk-footer-subtitle">{dict.pressSupport}</Text>

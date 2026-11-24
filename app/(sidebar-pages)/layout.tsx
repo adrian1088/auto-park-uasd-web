@@ -57,7 +57,7 @@ const LayoutShell = ({ children }: { children: React.ReactNode }) => {
     try {
       await logout();
     } catch {
-      // la sesión local se limpia 
+      // la sesión local se limpia
     } finally {
       router.replace("/sign-in");
       setIsLoggingOut(false);

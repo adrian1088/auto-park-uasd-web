@@ -8,6 +8,7 @@ import type {
   Payment,
   PaymentFilters,
   PaymentMethod,
+  PaymentOriginType,
 } from "@/app/lib/api/payments";
 import { DEFAULT_PAGE_SIZE } from "@/app/lib/constants";
 import { formatDateTime, formatMoney } from "@/app/lib/utils/format";
@@ -21,6 +22,52 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
+}
+
+function resolvePaymentOrigin(payment: Payment): {
+  kind: PaymentOriginType;
+  text: string;
+} {
+  if (payment.originType) {
+    if (payment.originType === "SUBSCRIPTION") {
+      return {
+        kind: "SUBSCRIPTION",
+        text: payment.originLabel || "Renovación de Suscripción",
+      };
+    }
+    if (payment.originType === "RESERVATION") {
+      return {
+        kind: "RESERVATION",
+        text: payment.ticket?.code
+          ? `Reservación · #${payment.ticket.code}`
+          : payment.originLabel || "Reservación",
+      };
+    }
+    return {
+      kind: "COMMON_TICKET",
+      text: payment.ticket?.code
+        ? `Cliente Común`
+        : payment.originLabel || "Cliente Común",
+    };
+  }
+
+  if (!payment.ticket) {
+    return { kind: "SUBSCRIPTION", text: "Renovación de Suscripción" };
+  }
+  if (payment.ticket.reservationId != null) {
+    return {
+      kind: "RESERVATION",
+      text: payment.ticket.code
+        ? `Reservación · #${payment.ticket.code}`
+        : "Reservación",
+    };
+  }
+  return {
+    kind: "COMMON_TICKET",
+    text: payment.ticket.code
+      ? `Cliente Común`
+      : "Cliente Común",
+  };
 }
 
 export type DataTablePaymentProps = {
@@ -107,44 +154,64 @@ const DataTablePayment = ({
 
   const columns: TableProps<Payment>["columns"] = [
     {
-      title: "Origen / Referencia",
-      key: "ticket",
+      title: <span style={{ fontSize: "12.5px" }}>Origen / Referencia</span>,
+      key: "origin",
       render: (_value, payment) => {
-        if (payment.ticket?.code) {
-          return <Tag color="blue">Ticket #{payment.ticket.code}</Tag>;
-        }
-        return <Tag color="purple">Renovación de Suscripción</Tag>;
+        const { kind, text } = resolvePaymentOrigin(payment);
+        const color =
+          kind === "COMMON_TICKET"
+            ? "blue"
+            : kind === "RESERVATION"
+              ? "cyan"
+              : "purple";
+
+        return (
+          <Tag
+            color={color}
+            style={{ fontSize: "12px", padding: "1px 8px", borderRadius: "6px" }}
+          >
+            {text}
+          </Tag>
+        );
       },
     },
     {
-      title: "Monto",
+      title: <span style={{ fontSize: "12.5px" }}>Monto</span>,
       dataIndex: "amount",
       key: "amount",
       render: (val) => (
-        <span style={{ fontWeight: "bold", color: "#3f8600" }}>
+        <span style={{ fontWeight: 600, color: "#3f8600", fontSize: "12.5px" }}>
           {formatMoney(val)}
         </span>
       ),
     },
     {
-      title: "Método de Pago",
+      title: <span style={{ fontSize: "12.5px" }}>Método de Pago</span>,
       dataIndex: "method",
       key: "method",
-      render: (method: PaymentMethod) => paymentMethodLabels[method] || method,
+      render: (method: PaymentMethod) => (
+        <span style={{ fontSize: "12.5px" }}>
+          {paymentMethodLabels[method] || method}
+        </span>
+      ),
     },
     {
-      title: "Fecha de Registro",
+      title: <span style={{ fontSize: "12.5px" }}>Fecha de Registro</span>,
       dataIndex: "date",
       key: "date",
-      render: formatDateTime,
+      render: (val) => (
+        <span style={{ fontSize: "12.5px" }}>{formatDateTime(val)}</span>
+      ),
     },
     {
-      title: "Acciones",
+      title: <span style={{ fontSize: "12.5px" }}>Acciones</span>,
       key: "actions",
       render: (_value, payment) => (
-        <Space>
+        <Space size={8}>
           <Button
             type="link"
+            size="small"
+            style={{ fontSize: "12.5px", paddingInline: 4 }}
             loading={editingId === payment.id}
             disabled={editingId !== null}
             onClick={() => void handleEdit(payment.id)}
@@ -161,7 +228,9 @@ const DataTablePayment = ({
           >
             <Button
               type="link"
+              size="small"
               danger
+              style={{ fontSize: "12.5px", paddingInline: 4 }}
               loading={deletingId === payment.id}
               disabled={deletingId !== null}
             >
@@ -174,12 +243,13 @@ const DataTablePayment = ({
   ];
 
   return (
-    <>
+    <div style={{ fontSize: "12.5px" }}>
       {contextHolder}
       {loadError && (
         <Alert
           type="error"
           showIcon
+          style={{ fontSize: "12.5px", margin: "8px 16px" }}
           title="No se pudieron cargar los pagos."
           description={loadError}
           action={
@@ -198,15 +268,16 @@ const DataTablePayment = ({
           current: page,
           pageSize,
           total,
+          size: "small",
           showSizeChanger: true,
-          style: { paddingRight: "24px" },
+          style: { paddingRight: "20px", fontSize: "12px" },
         }}
         onChange={(pagination) => {
           setPage(pagination.current ?? 1);
           setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
         }}
       />
-    </>
+    </div>
   );
 };
 

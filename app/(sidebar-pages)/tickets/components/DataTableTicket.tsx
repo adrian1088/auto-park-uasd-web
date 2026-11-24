@@ -79,60 +79,44 @@ const DataTableTicket = ({ filters, onView }: DataTableTicketProps) => {
 
   const columns: TableProps<Ticket>["columns"] = [
     { 
-      title: <Text strong style={{ color: "#475569" }}>Código</Text>, 
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Código</Text>, 
       dataIndex: "code", 
       key: "code",
-      render: (code) => <Text strong style={{ color: "#0f172a" }}>{code || "N/A"}</Text>
-    },
-    { 
-      title: <Text strong style={{ color: "#475569" }}>Matrícula</Text>, 
-      dataIndex: "plateNumber", 
-      key: "plateNumber", 
-      render: (plate) => (
-        <Tag style={{ background: "#f8fafc", borderColor: "#e2e8f0", color: "#334155", fontWeight: 600, borderRadius: "6px" }}>
-          {plate || "N/A"}
-        </Tag>
-      ) 
-    },
-    { 
-      title: <Text strong style={{ color: "#475569" }}>Espacio</Text>, 
-      dataIndex: "spotNumber", 
-      key: "spotNumber", 
-      render: (spot) => <Text style={{ color: "#334155" }}>{spot || "VIP"}</Text> 
+      render: (code) => <Text strong style={{ color: "#0f172a", fontSize: "12px" }}>{code || "N/A"}</Text>
     },
     {
-      title: <Text strong style={{ color: "#475569" }}>Entrada</Text>,
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Entrada</Text>,
       dataIndex: "entranceAt",
       key: "entranceAt",
-      render: (date) => <Text type="secondary" style={{ fontSize: "13px" }}>{formatDateTime(date)}</Text>,
+      render: (date) => <Text type="secondary" style={{ fontSize: "12px" }}>{formatDateTime(date)}</Text>,
     },
     {
-      title: <Text strong style={{ color: "#475569" }}>Salida</Text>,
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Salida</Text>,
       dataIndex: "exitAt",
       key: "exitAt",
-      render: (date) => <Text type="secondary" style={{ fontSize: "13px" }}>{date ? formatDateTime(date) : "En curso"}</Text>,
+      render: (date) => <Text type="secondary" style={{ fontSize: "12px" }}>{date ? formatDateTime(date) : "En curso"}</Text>,
     },
     {
-      title: <Text strong style={{ color: "#475569" }}>Tarifa</Text>,
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Tarifa</Text>,
       dataIndex: "rateAmount",
       key: "rateAmount",
-      render: (amount) => <Text strong style={{ color: "#16a34a" }}>{formatMoney(amount)}</Text>,
+      render: (amount) => <Text strong style={{ color: "#16a34a", fontSize: "12px" }}>{formatMoney(amount)}</Text>,
     },
     {
-      title: <Text strong style={{ color: "#475569" }}>Estado</Text>,
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Estado</Text>,
       dataIndex: "status",
       key: "status",
       render: (status: TicketStatus) => {
         const config = ticketStatusLabels[status] || { label: status, color: "#334155", bg: "#f1f5f9" };
         return (
-          <Tag style={{ color: config.color, background: config.bg, border: "none", fontWeight: 600, padding: "2px 10px", borderRadius: "6px" }}>
+          <Tag style={{ color: config.color, background: config.bg, border: "none", fontWeight: 600, fontSize: "11px", padding: "2px 10px", borderRadius: "6px" }}>
             {config.label}
           </Tag>
         );
       },
     },
     {
-      title: <Text strong style={{ color: "#475569" }}>Acciones</Text>,
+      title: <Text strong style={{ color: "#475569", fontSize: "12px" }}>Acciones</Text>,
       key: "actions",
       align: "center",
       render: (_value, ticket) => (
@@ -140,7 +124,7 @@ const DataTableTicket = ({ filters, onView }: DataTableTicketProps) => {
           type="text" 
           icon={<EyeOutlined />} 
           onClick={() => onView(ticket.id)}
-          style={{ color: "#0284c7", fontWeight: 500 }}
+          style={{ color: "#0284c7", fontWeight: 500, fontSize: "12px" }}
         >
           Ver
         </Button>
@@ -150,7 +134,7 @@ const DataTableTicket = ({ filters, onView }: DataTableTicketProps) => {
 
   return (
     <Card 
-      style={{ borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}
+      style={{ borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", fontSize: "12px" }}
       styles={{ body: { padding: "0px" } }}
     >
       {loadError && (
@@ -173,12 +157,13 @@ const DataTableTicket = ({ filters, onView }: DataTableTicketProps) => {
         columns={columns}
         dataSource={tickets}
         loading={loading}
+        style={{ fontSize: "12px" }}
         pagination={{
           current: page,
           pageSize,
           total,
           showSizeChanger: true,
-          style: { padding: "16px 24px", margin: 0 },
+          style: { padding: "16px 24px", margin: 0, fontSize: "12px" },
         }}
         onChange={(pagination) => {
           setPage(pagination.current ?? 1);

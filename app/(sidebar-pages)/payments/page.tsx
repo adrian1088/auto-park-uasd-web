@@ -1,13 +1,14 @@
 "use client";
 
 import { Card, Flex, Row, Col, Statistic, message, Button } from "antd";
-import { 
-  DollarOutlined, 
-  CreditCardOutlined, 
-  RiseOutlined, 
-  CalendarOutlined, 
-  BarChartOutlined, 
-  FileTextOutlined 
+import {
+  DollarOutlined,
+  CreditCardOutlined,
+  RiseOutlined,
+  CalendarOutlined,
+  BarChartOutlined,
+  FileTextOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import HeaderPage from "@/app/components/HeaderPage";
@@ -22,12 +23,28 @@ import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error inesperado.";
 }
+
+const statCardBaseStyle: React.CSSProperties = {
+  borderRadius: "10px",
+};
+
+const statBodyStyle: React.CSSProperties = {
+  padding: "12px 16px",
+};
+
+const statTitleStyle: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+  marginBottom: 2,
+};
 
 const PaymentsPage = () => {
   const [filters, setFilters] = useState<PaymentFilters>({});
-  const reloadKey = 0; // Sin setter no usado
+  const [reloadKey, setReloadKey] = useState<number>(0);
 
   // Estados para métricas profesionales de caja y periodos temporales
   const [todayRevenue, setTodayRevenue] = useState<number>(0);
@@ -40,7 +57,9 @@ const PaymentsPage = () => {
 
   // Estados para el Modal de Reporte Financiero Detallado
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [allPaymentsForReport, setAllPaymentsForReport] = useState<Payment[]>([]);
+  const [allPaymentsForReport, setAllPaymentsForReport] = useState<Payment[]>(
+    [],
+  );
 
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -49,7 +68,11 @@ const PaymentsPage = () => {
 
     const fetchMetricsData = async () => {
       try {
-        const response = await getPaymentsPaginated({ page: 1, limit: 50, ...filters });
+        const response = await getPaymentsPaginated({
+          page: 1,
+          limit: 50,
+          ...filters,
+        });
         if (!active) return;
 
         const paymentsList: Payment[] = response.data || [];
@@ -61,7 +84,7 @@ const PaymentsPage = () => {
         let monthSum = 0;
         let semesterSum = 0;
         let yearSum = 0;
-        
+
         const methodCounts: Record<string, number> = {};
 
         paymentsList.forEach((p) => {
@@ -75,7 +98,10 @@ const PaymentsPage = () => {
           if (paymentDate.isAfter(now.subtract(7, "day").startOf("day"))) {
             weekSum += amount;
           }
-          if (paymentDate.isSame(now, "month") && paymentDate.isSame(now, "year")) {
+          if (
+            paymentDate.isSame(now, "month") &&
+            paymentDate.isSame(now, "year")
+          ) {
             monthSum += amount;
           }
           if (paymentDate.isAfter(now.subtract(6, "month").startOf("day"))) {
@@ -143,105 +169,203 @@ const PaymentsPage = () => {
   };
 
   return (
-    <Flex vertical gap={16}>
+    <Flex vertical gap={14} style={{ fontSize: "13px" }}>
       {contextHolder}
-      
-      <Flex justify="space-between" align="center" wrap gap={8}>
+
+      <Flex vertical gap={10} align="flex-start">
         <HeaderPage
           title="Gestión de Caja y Analítica Financiera"
           description="Control de cobros de tickets, ingresos por suscripciones y reportes de rendimiento por periodos (Semanal, Mensual, Semestral y Anual)."
         />
-        <Button 
-          type="primary" 
-          icon={<FileTextOutlined />} 
-          size="large"
-          onClick={handleOpenReport}
-          style={{ borderRadius: "6px", backgroundColor: "#0958d9" }}
-        >
-          Generar Reporte Detallado
-        </Button>
+        <Flex gap={8} wrap="wrap" align="center" justify="flex-start">
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => setReloadKey((k) => k + 1)}
+            style={{ borderRadius: "6px", fontSize: "13px" }}
+          >
+            Refrescar Vista
+          </Button>
+          <Button
+            type="primary"
+            icon={<FileTextOutlined />}
+            onClick={handleOpenReport}
+            style={{
+              borderRadius: "6px",
+              backgroundColor: "#0958d9",
+              fontSize: "13px",
+            }}
+          >
+            Generar Reporte Detallado
+          </Button>
+        </Flex>
       </Flex>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[12, 12]}>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless" style={{ background: "#f6ffed", border: "1px solid #b7eb8f" }}>
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              background: "#f6ffed",
+              border: "1px solid #b7eb8f",
+            }}
+          >
             <Statistic
-              title="Caja de Hoy (Diario)"
+              title={<span style={statTitleStyle}>Caja de Hoy (Diario)</span>}
               value={todayRevenue}
               precision={2}
-              prefix={<CalendarOutlined />}
-              styles={{ content: { color: "#3f8600" } }}
-              formatter={(val) => `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`}
+              prefix={<CalendarOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { color: "#3f8600", fontSize: "18px", fontWeight: 600 },
+              }}
+              formatter={(val) =>
+                `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+              }
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless" style={{ background: "#e6f4ff", border: "1px solid #91caff" }}>
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              background: "#e6f4ff",
+              border: "1px solid #91caff",
+            }}
+          >
             <Statistic
-              title="Ingresos de la Semana (7 days)"
+              title={
+                <span style={statTitleStyle}>Ingresos de la Semana (7 days)</span>
+              }
               value={weekRevenue}
               precision={2}
-              prefix={<RiseOutlined />}
-              styles={{ content: { color: "#1677ff" } }}
-              formatter={(val) => `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`}
+              prefix={<RiseOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { color: "#1677ff", fontSize: "18px", fontWeight: 600 },
+              }}
+              formatter={(val) =>
+                `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+              }
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless" style={{ background: "#fff7e6", border: "1px solid #ffd591" }}>
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              background: "#fff7e6",
+              border: "1px solid #ffd591",
+            }}
+          >
             <Statistic
-              title="Ingresos del Mes Actual"
+              title={<span style={statTitleStyle}>Ingresos del Mes Actual</span>}
               value={monthRevenue}
               precision={2}
-              prefix={<DollarOutlined />}
-              styles={{ content: { color: "#fa8c16" } }}
-              formatter={(val) => `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`}
+              prefix={<DollarOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { color: "#fa8c16", fontSize: "18px", fontWeight: 600 },
+              }}
+              formatter={(val) =>
+                `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+              }
             />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[12, 12]}>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless">
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              border: "1px solid #e2e8f0",
+            }}
+          >
             <Statistic
-              title="Últimos 6 Meses (Semestral)"
+              title={
+                <span style={statTitleStyle}>Últimos 6 Meses (Semestral)</span>
+              }
               value={semesterRevenue}
               precision={2}
-              prefix={<BarChartOutlined />}
-              formatter={(val) => `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`}
+              prefix={<BarChartOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { fontSize: "18px", fontWeight: 600 },
+              }}
+              formatter={(val) =>
+                `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+              }
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless">
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              border: "1px solid #e2e8f0",
+            }}
+          >
             <Statistic
-              title="Acumulado del Año Actual"
+              title={<span style={statTitleStyle}>Acumulado del Año Actual</span>}
               value={yearRevenue}
               precision={2}
-              prefix={<DollarOutlined />}
-              styles={{ content: { color: "#531dab" } }}
-              formatter={(val) => `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`}
+              prefix={<DollarOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { color: "#531dab", fontSize: "18px", fontWeight: 600 },
+              }}
+              formatter={(val) =>
+                `RD$ ${Number(val).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+              }
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8}>
-          <Card variant="borderless">
+          <Card
+            variant="borderless"
+            styles={{ body: statBodyStyle }}
+            style={{
+              ...statCardBaseStyle,
+              border: "1px solid #e2e8f0",
+            }}
+          >
             <Statistic
-              title="Método Preferido / Transacciones"
+              title={
+                <span style={statTitleStyle}>
+                  Método Preferido / Transacciones
+                </span>
+              }
               value={topMethod}
-              suffix={`(${totalTransactions} tks)`}
-              prefix={<CreditCardOutlined />}
+              suffix={
+                <span style={{ fontSize: "13px", color: "#64748b" }}>
+                  ({totalTransactions} tks)
+                </span>
+              }
+              prefix={<CreditCardOutlined style={{ fontSize: "15px" }} />}
+              styles={{
+                content: { fontSize: "18px", fontWeight: 600 },
+              }}
             />
           </Card>
         </Col>
       </Row>
 
       <Card
-        title="Historial de Cobros y Auditoría Financiera"
-        styles={{ body: { padding: 0 } }}
+        title={
+          <span style={{ fontSize: "14px", fontWeight: 600 }}>
+            Historial de Cobros y Auditoría Financiera
+          </span>
+        }
+        style={{ borderRadius: "10px", border: "1px solid #e2e8f0" }}
+        styles={{ body: { padding: "4px 0 8px 0" } }}
         extra={
-          <Flex gap={8} wrap>
+          <Flex gap={8} wrap="wrap">
             <FilterPayment value={filters} onChange={setFilters} />
           </Flex>
         }

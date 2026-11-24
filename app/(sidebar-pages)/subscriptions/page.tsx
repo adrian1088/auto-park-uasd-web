@@ -134,7 +134,6 @@ const SubscriptionsPage = () => {
     setIsHistoryModalOpen(true);
     setLoadingHistory(true);
     try {
-      // Solicitamos los pagos recientes de caja
       const response = await getPaymentsPaginated({ page: 1, limit: 100 });
       let allPayments: Payment[] = [];
 
@@ -149,7 +148,6 @@ const SubscriptionsPage = () => {
         allPayments = (response as { data: Payment[] }).data;
       }
 
-      // Pasamos la lista completa de pagos al estado del modal
       setClientPayments(allPayments);
     } catch (err) {
       console.error("Error al obtener los pagos:", err);
@@ -176,7 +174,7 @@ const SubscriptionsPage = () => {
       );
       setIsRenewModalOpen(false);
       setRenewingSub(null);
-      void fetchData();
+      await fetchData();
     } catch (error: unknown) {
       const err = error as { message?: string };
       messageApi.error(err?.message || "No se pudo procesar la renovación.");
@@ -194,7 +192,7 @@ const SubscriptionsPage = () => {
       messageApi.success(
         `Suscripción ${newStatus === "PAUSED" ? "pausada" : "reactivada"} en el servidor.`,
       );
-      void fetchData();
+      await fetchData();
     } catch {
       messageApi.error("No se pudo cambiar el estado de la suscripción.");
     }
@@ -266,7 +264,7 @@ const SubscriptionsPage = () => {
 
       setIsModalOpen(false);
       form.resetFields();
-      void fetchData();
+      await fetchData();
     } catch (error: unknown) {
       const err = error as { message?: string };
       messageApi.error(err?.message || "No se pudo guardar la suscripción.");
@@ -279,7 +277,7 @@ const SubscriptionsPage = () => {
     try {
       await SubscriptionsService.remove(id);
       messageApi.success("Suscripción eliminada de la base de datos.");
-      void fetchData();
+      await fetchData();
     } catch {
       messageApi.error("No se pudo eliminar la suscripción.");
     }
@@ -325,7 +323,7 @@ const SubscriptionsPage = () => {
       <Row justify="space-between" align="middle">
         <Col>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={fetchData}>
+            <Button icon={<ReloadOutlined />} onClick={() => void fetchData()}>
               Actualizar
             </Button>
             <Button
@@ -339,7 +337,6 @@ const SubscriptionsPage = () => {
         </Col>
       </Row>
 
-      {/* KPI Metrics */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={6}>
           <Card variant="borderless">
@@ -382,7 +379,6 @@ const SubscriptionsPage = () => {
         </Col>
       </Row>
 
-      {/* Filtros */}
       <Card>
         <Row gutter={16} align="middle">
           <Col xs={24} sm={12} md={8}>
@@ -410,7 +406,6 @@ const SubscriptionsPage = () => {
         </Row>
       </Card>
 
-      {/* Tabla Principal Modularizada */}
       <Card styles={{ body: { padding: 0 } }}>
         <SubscriptionsTable
           subscriptions={filteredSubscriptions}
@@ -423,7 +418,6 @@ const SubscriptionsPage = () => {
         />
       </Card>
 
-      {/* Modales */}
       <SubscriptionModal
         open={isModalOpen}
         editingSub={editingSub}

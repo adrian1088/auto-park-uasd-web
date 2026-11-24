@@ -173,6 +173,7 @@ const RatesPage = () => {
         }
       >
         <DataTableRate
+          key={`${filterLotId ?? ""}-${filterType ?? ""}`}
           parkingLotId={filterLotId}
           type={filterType}
           reloadKey={reloadKey}

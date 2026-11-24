@@ -11,15 +11,6 @@ export type Rate = {
   validTo?: string | null;
 };
 
-function normalizeRate(rate: Rate): Rate {
-  return {
-    ...rate,
-    id: Number(rate.id),
-    parkingLot: rate.parkingLot,
-    amount: Number(rate.amount),
-  };
-}
-
 export type RateFields = {
   parkingLotId: number;
   type: RateType;

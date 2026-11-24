@@ -4,23 +4,18 @@ import React, { useState, useRef, useEffect, useCallback, useTransition } from "
 import { Modal, Button, Typography, Space, message as antMessage, Card, Alert, Tag, Tooltip } from "antd";
 import { CheckCircleOutlined, BugOutlined, ReloadOutlined } from "@ant-design/icons";
 import QRCode from "qrcode";
-import KioskTicket from "@/app/customer-panel/components/Ticket";
+import KioskTicket from "../../components/gate/Ticket";
+import Success from "../../components/gate/Success";
 
 import CheckInForm from "./components/CheckInForm";
-import ParkingMap from "./components/ParkingMap";
+import ParkingMap from "../../components/map/ParkingMap";
+import ReservationQrScanner, {
+  type ReservationRecord,
+} from "../../components/gate/ReservationQrScanner";
 import { processGateEntry, GateEntryResult } from "@/app/lib/api/gate";
+import { checkInTicket, type Ticket } from "@/app/lib/api/tickets";
 
 const { Title, Text, Paragraph } = Typography;
-
-export enum VehicleType {
-  CAR = "CAR",
-  TRUCK = "TRUCK",
-  MOTORCYCLE = "MOTORCYCLE",
-  VAN = "VAN",
-  BUS = "BUS",
-  SUV = "SUV",
-  PICKUP = "PICKUP",
-}
 
 interface DiagnosticState {
   status: "CHECKING" | "OK" | "WARNING" | "ERROR";
@@ -28,19 +23,85 @@ interface DiagnosticState {
   details?: string;
 }
 
+type ExtendedGateEntryResult = GateEntryResult & {
+  rateAmount?: number | string | null;
+  rate_amount?: number | string | null;
+};
+
+type TicketLikeResponse = Ticket & {
+  vehicle_plate_number?: string;
+  space_number?: string;
+  spot_number?: string;
+  entrance_at?: string;
+  rate_amount?: number | string;
+  rate?: { amount?: number | string };
+  reservation?: {
+    id?: number;
+    vehiclePlateNumber?: string | null;
+    vehicle_plate_number?: string | null;
+    parkingSpace?: { spaceNumber?: string; space_number?: string } | null;
+  } | null;
+};
+
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
+).replace(/\/$/, "");
+
+function mapTicketToReceipt(
+  createdTicket: TicketLikeResponse,
+  fallbackPlate: string,
+): ExtendedGateEntryResult {
+  const plate =
+    createdTicket.vehiclePlateNumber ||
+    createdTicket.vehicle_plate_number ||
+    createdTicket.plateNumber ||
+    createdTicket.vehicle?.plateNumber ||
+    createdTicket.reservation?.vehiclePlateNumber ||
+    createdTicket.reservation?.vehicle_plate_number ||
+    fallbackPlate ||
+    "N/A";
+
+  const space =
+    createdTicket.spot?.spaceNumber ||
+    createdTicket.spaceNumber ||
+    createdTicket.space_number ||
+    createdTicket.spotNumber ||
+    createdTicket.spot_number ||
+    createdTicket.reservation?.parkingSpace?.spaceNumber ||
+    createdTicket.reservation?.parkingSpace?.space_number ||
+    "ASIGNADO";
+
+  const resolvedRate =
+    createdTicket.rateAmount ??
+    createdTicket.rate_amount ??
+    createdTicket.rate?.amount ??
+    null;
+
+  return {
+    ticketId: createdTicket.id,
+    ticketNumber: createdTicket.code,
+    plateNumber: String(plate).trim().toUpperCase() || "N/A",
+    hasReservation: Boolean(createdTicket.reservation),
+    assignedSpace: String(space).trim() || "ASIGNADO",
+    entryTime: createdTicket.entranceAt || createdTicket.entrance_at || new Date().toISOString(),
+    rateAmount: resolvedRate,
+  };
+}
+
 export default function CheckInPage() {
   const [entryType, setEntryType] = useState<"SIN_RESERVACION" | "CON_RESERVACION">("SIN_RESERVACION");
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+  const [showReceiptView, setShowReceiptView] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(5);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-  const [, startTransition] = useTransition();
+  const [] = useTransition();
 
   const [plateNumber, setPlateNumber] = useState<string>("");
   const [userId, setUserId] = useState<number | null>(null);
-  const [vehicleType, setVehicleType] = useState<VehicleType>(VehicleType.CAR);
-  const [reservationId, setReservationId] = useState<number | null>(null);
-  
-  const [ticketResult, setTicketResult] = useState<GateEntryResult | null>(null);
+  const [reservationCode, setReservationCode] = useState<string>("");
+
+  const [ticketResult, setTicketResult] = useState<ExtendedGateEntryResult | null>(null);
   const [diagnostic, setDiagnostic] = useState<DiagnosticState | null>(null);
 
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -48,13 +109,86 @@ export default function CheckInPage() {
   const kioskDict = {
     printingTicket: "TICKET GENERADO CON ÉXITO",
     takeTicket: "SEDE UNIVERSITARIA UASD (LOTE 1)",
-    ticketInstruction: "Entregue el comprobante impreso al conductor",
+    ticketInstruction: "Entregue el comprobante al conductor",
     parkingReceipt: "Comprobante de Estacionamiento - Operador",
     plateLabel: "MATRÍCULA:",
     dateTimeLabel: "FECHA / HORA:",
     locationLabel: "UBICACIÓN:",
     rateLabel: "TARIFA:",
   };
+
+  const successDict = {
+    barrierOpenTitle: "BARRERA ABIERTA",
+    driveCarefully: "Conduzca con precaución hacia su espacio asignado.",
+    closingIn: "Cerrando en",
+  };
+
+  const renderTicketQr = useCallback((gateResult: GateEntryResult, fallbackPlate: string) => {
+    setTimeout(() => {
+      if (qrCanvasRef.current && gateResult) {
+        const tCode = gateResult.ticketNumber || `TCK-${Date.now()}`;
+        const pNum = gateResult.plateNumber || fallbackPlate || "S/N";
+        const space = gateResult.assignedSpace || "GENERAL";
+
+        const qrPayload = `AUTOPARK|${tCode}|${pNum}|${space}`;
+
+        QRCode.toCanvas(
+          qrCanvasRef.current,
+          qrPayload,
+          { width: 74, margin: 1, color: { dark: "#0f172a", light: "#ffffff" } },
+          (error: Error | null | undefined) => {
+            if (error) console.error("Error al renderizar QR en canvas:", error);
+          },
+        );
+      }
+    }, 150);
+  }, []);
+
+  const handleCheckInError = useCallback((error: unknown) => {
+    const err = error as {
+      status?: number;
+      message?: unknown;
+      data?: { message?: unknown };
+      body?: { message?: unknown };
+      response?: { status?: number; data?: { message?: unknown } };
+    };
+    const rawMessage =
+      err.data?.message ??
+      err.body?.message ??
+      err.response?.data?.message ??
+      err.message ??
+      "";
+    const serverMessage = Array.isArray(rawMessage)
+      ? rawMessage.map(String).filter(Boolean).join(", ")
+      : typeof rawMessage === "string"
+        ? rawMessage
+        : String(rawMessage || "");
+    const status = err.status || err.response?.status;
+    const normalizedMsg = serverMessage.toLowerCase();
+
+    if (normalizedMsg.includes("compatible")) {
+      antMessage.info(
+        "El espacio reservado no es compatible con el vehículo",
+      );
+      return;
+    }
+
+    if (
+      status === 400 ||
+      normalizedMsg.includes("espacio") ||
+      normalizedMsg.includes("lleno") ||
+      normalizedMsg.includes("capacidad") ||
+      normalizedMsg.includes("matrícula") ||
+      normalizedMsg.includes("bad request")
+    ) {
+      antMessage.warning(
+        serverMessage ||
+          "⚠️ El estacionamiento se encuentra lleno o la matrícula no está disponible en este momento.",
+      );
+    } else {
+      antMessage.error(serverMessage || "Error al procesar el acceso en la garita.");
+    }
+  }, []);
 
   const runSystemDiagnostic = useCallback(async () => {
     setDiagnostic({
@@ -63,10 +197,10 @@ export default function CheckInPage() {
     });
 
     try {
-      const res = await fetch("http://localhost:3001/api/v1/parking/spaces?lotId=1", {
+      const res = await fetch(`${API_BASE_URL}/parking/spaces?lotId=1`, {
         credentials: "include",
       });
-      
+
       if (res.status === 401) {
         setDiagnostic({
           status: "ERROR",
@@ -104,89 +238,127 @@ export default function CheckInPage() {
       const err = error as Error;
       setDiagnostic({
         status: "ERROR",
-        message: "No se pudo establecer conexión con http://localhost:3001/api/v1",
+        message: `No se pudo establecer conexión con ${API_BASE_URL}`,
         details: `Detalle: ${err.message}`,
       });
     }
   }, []);
 
   useEffect(() => {
-    startTransition(() => {
-      runSystemDiagnostic();
-    });
-  }, [runSystemDiagnostic]);
+    if (!isModalVisible || showReceiptView) return;
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setIsModalVisible(false);
+          setShowReceiptView(false);
+          return 5;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [isModalVisible, showReceiptView, countdown]);
+
+  useEffect(() => {
+    if (isModalVisible && showReceiptView && ticketResult) {
+      renderTicketQr(ticketResult, plateNumber);
+    }
+  }, [isModalVisible, showReceiptView, ticketResult, plateNumber, renderTicketQr]);
+
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+    setShowReceiptView(false);
+    setCountdown(5);
+  };
+
+  const openSuccessModalWithTicket = (gateResult: ExtendedGateEntryResult, plateUsed: string) => {
+    setTicketResult(gateResult);
+    setShowReceiptView(true);
+    setCountdown(5);
+    setIsModalVisible(true);
+    setRefreshTrigger((prev: number) => prev + 1);
+    renderTicketQr(gateResult, plateUsed);
+  };
 
   const handleProcessCheckIn = async () => {
-    if (entryType === "CON_RESERVACION" && !reservationId) {
-      antMessage.warning("Por favor, ingrese el ID de la reservación.");
+    if (loading) return;
+
+    const cleanPlate = plateNumber.trim().toUpperCase();
+    if (cleanPlate.length < 4) {
+      antMessage.warning("Ingresa una matrícula válida (mínimo 4 caracteres).");
       return;
     }
 
     setLoading(true);
     try {
-      let gateResult: GateEntryResult | null = null;
+      const createdTicket = await checkInTicket({
+        plateNumber: cleanPlate,
+        parkingLotId: 1,
+      });
 
-      if (entryType === "CON_RESERVACION" && reservationId) {
-        // Validación con ID de reserva para asignación dinámica en backend
-        gateResult = await processGateEntry("RESERVA", 1, "AUTOMATIC_LPR");
-      } else {
-        const isManualInput = Boolean(plateNumber && plateNumber.trim() !== "");
-        const plateToSend = isManualInput ? plateNumber.trim().toUpperCase() : "AUTO";
-        const entrySource = isManualInput ? "MANUAL" : "AUTOMATIC_LPR";
+      const mappedResult = mapTicketToReceipt(createdTicket, cleanPlate);
+      openSuccessModalWithTicket(mappedResult, cleanPlate);
+      antMessage.success("¡Entrada registrada y espacio asignado con éxito!");
 
-        gateResult = await processGateEntry(plateToSend, 1, entrySource);
+      setPlateNumber("");
+      setUserId(null);
+    } catch (error: unknown) {
+      handleCheckInError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReservationResolved = async (reservation: ReservationRecord) => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const resPlate = String(
+        reservation.vehiclePlateNumber ?? reservation.vehicle_plate_number ?? "",
+      )
+        .trim()
+        .toUpperCase();
+      const numericReservationId = Number(reservation.id);
+
+      if (
+        !reservation.isSubscriptionPass &&
+        Number.isInteger(numericReservationId) &&
+        numericReservationId > 0
+      ) {
+        const createdTicket = await checkInTicket({
+          reservationId: numericReservationId,
+        });
+
+        const mappedResult = mapTicketToReceipt(createdTicket, resPlate || "RESERVA");
+        openSuccessModalWithTicket(mappedResult, resPlate || "RESERVA");
+        antMessage.success("¡Reserva validada y ticket generado con éxito!");
+        setReservationCode("");
+        return;
       }
 
+      const lotId = reservation.parkingSpace?.floor?.lot?.id ?? 1;
+      const plateForGate = resPlate || "AUTO";
+      const codeToSend =
+        reservation.qrCode ?? reservation.qr_code ?? reservationCode.trim();
+
+      const gateResult = await processGateEntry(
+        plateForGate,
+        lotId,
+        "MANUAL",
+        codeToSend,
+      );
       if (!gateResult) {
         throw new Error("No se pudo procesar la entrada en la garita.");
       }
 
-      setTicketResult(gateResult);
-      setIsModalVisible(true);
-      antMessage.success("¡Entrada registrada y espacio asignado con éxito!");
+      openSuccessModalWithTicket(gateResult, plateForGate);
+      antMessage.success("¡Suscripción validada y ticket generado con éxito!");
 
-      // Limpiar campos y actualizar mapa en tiempo real
-      setPlateNumber("");
-      setUserId(null);
-      setReservationId(null);
-      setRefreshTrigger((prev: number) => prev + 1);
-
-      // Generar código QR con datos garantizados
-      setTimeout(() => {
-        if (qrCanvasRef.current && gateResult) {
-          const tCode = gateResult.ticketNumber || `TCK-${Date.now()}`;
-          const pNum = gateResult.plateNumber || plateNumber || "S/N";
-          const space = gateResult.assignedSpace || "GENERAL";
-
-          const qrPayload = `AUTOPARK|${tCode}|${pNum}|${space}`;
-
-          QRCode.toCanvas(
-            qrCanvasRef.current,
-            qrPayload,
-            { width: 180, margin: 1, color: { dark: "#0f172a", light: "#ffffff" } },
-            (error: Error | null | undefined) => {
-              if (error) console.error("Error al renderizar QR en canvas:", error);
-            }
-          );
-        }
-      }, 150);
+      setReservationCode("");
     } catch (error: unknown) {
-      const err = error as { status?: number; message?: string; data?: { message?: string } };
-      const serverMessage = err.data?.message || err.message || "";
-      const status = err.status || (error as { response?: { status?: number } }).response?.status;
-      
-      if (
-        status === 400 ||
-        serverMessage.toLowerCase().includes("espacio") || 
-        serverMessage.toLowerCase().includes("lleno") || 
-        serverMessage.toLowerCase().includes("capacidad") ||
-        serverMessage.toLowerCase().includes("matrícula") ||
-        serverMessage.toLowerCase().includes("bad request")
-      ) {
-        antMessage.warning("⚠️ El estacionamiento se encuentra lleno o la matrícula no está disponible en este momento.");
-      } else {
-        antMessage.error(serverMessage || "Error al procesar el acceso en la garita.");
-      }
+      handleCheckInError(error);
     } finally {
       setLoading(false);
     }
@@ -202,9 +374,10 @@ export default function CheckInPage() {
       })
     : "20/10/26 12:00";
 
+  const ticketRate = ticketResult?.rateAmount ?? ticketResult?.rate_amount ?? null;
+
   return (
     <div style={{ padding: "24px", minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      {/* Cabecera Principal */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px" }}>
         <div>
           <Title level={3} style={{ margin: 0, fontWeight: 700 }}>
@@ -251,82 +424,122 @@ export default function CheckInPage() {
         />
       )}
 
-      {/* Grid de 2 Columnas (Formulario de Check-In + Mapa de Estacionamiento) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "20px", alignItems: "start" }}>
-        {/* Columna 1: Formulario */}
         <Card style={{ borderRadius: "12px", border: "1px solid #e2e8f0" }} styles={{ body: { padding: "20px" } }}>
-          <CheckInForm
-            entryType={entryType}
-            setEntryType={setEntryType}
-            plateNumber={plateNumber}
-            setPlateNumber={setPlateNumber}
-            userId={userId}
-            setUserId={setUserId}
-            vehicleType={vehicleType}
-            setVehicleType={setVehicleType}
-            reservationId={reservationId}
-            setReservationId={setReservationId}
-            onSubmit={handleProcessCheckIn}
-            loading={loading}
-          />
+          {entryType === "CON_RESERVACION" ? (
+            <ReservationQrScanner
+              entryType={entryType}
+              setEntryType={setEntryType}
+              reservationCode={reservationCode}
+              setReservationCode={setReservationCode}
+              onResolved={handleReservationResolved}
+              loading={loading}
+            />
+          ) : (
+            <CheckInForm
+              entryType={entryType}
+              setEntryType={setEntryType}
+              plateNumber={plateNumber}
+              setPlateNumber={setPlateNumber}
+              userId={userId}
+              setUserId={setUserId}
+              reservationCode={reservationCode}
+              setReservationCode={setReservationCode}
+              onSubmit={handleProcessCheckIn}
+              loading={loading}
+            />
+          )}
         </Card>
 
-        {/* Columna 2: Mapa de Estacionamiento Interactivo */}
         <ParkingMap refreshTrigger={refreshTrigger} />
       </div>
 
-      {/* Modal de Ticket Generado */}
       <Modal
         title={
-          <Space align="center" style={{ paddingBottom: "8px" }}>
-            <CheckCircleOutlined style={{ color: ticketResult?.hasReservation ? "#52c41a" : "#0284c7", fontSize: "20px" }} />
-            <Text strong style={{ fontSize: "18px" }}>
-              {ticketResult?.hasReservation ? "Comprobante de Entrada - Abonado / Reserva" : "Comprobante de Entrada (Visitante)"}
-            </Text>
-          </Space>
+          showReceiptView ? (
+            <Space align="center" style={{ paddingBottom: "4px" }}>
+              <CheckCircleOutlined
+                style={{
+                  color: ticketResult?.hasReservation ? "#52c41a" : "#0284c7",
+                  fontSize: "18px",
+                }}
+              />
+              <Text strong style={{ fontSize: "16px" }}>
+                {ticketResult?.hasReservation
+                  ? "Comprobante de Entrada - Abonado / Reserva"
+                  : "Comprobante de Entrada (Visitante)"}
+              </Text>
+            </Space>
+          ) : null
         }
         open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={[
-          <Button
-            key="print"
-            type="primary"
-            size="large"
-            onClick={() => setIsModalVisible(false)}
-            style={{ borderRadius: "6px", width: "100%", backgroundColor: ticketResult?.hasReservation ? "#16a34a" : "#0284c7" }}
-          >
-            Imprimir Comprobante y Abrir Barrera
-          </Button>,
-        ]}
-        width={550}
+        onCancel={handleCloseModal}
+        footer={
+          showReceiptView
+            ? [
+                <Button
+                  key="to-success"
+                  type="primary"
+                  onClick={() => {
+                    setCountdown(5);
+                    setShowReceiptView(false);
+                  }}
+                  style={{
+                    borderRadius: "6px",
+                    width: "100%",
+                    backgroundColor: ticketResult?.hasReservation ? "#16a34a" : "#0284c7",
+                  }}
+                >
+                  Continuar a Barrera
+                </Button>,
+              ]
+            : [
+                <Button key="view-ticket" onClick={() => setShowReceiptView(true)}>
+                  Ver Ticket
+                </Button>,
+                <Button key="close-now" type="primary" onClick={handleCloseModal}>
+                  Listo
+                </Button>,
+              ]
+        }
+        width={showReceiptView ? 430 : 680}
         centered
         destroyOnHidden
       >
-        <div style={{ padding: "12px 0" }}>
-          {ticketResult?.hasReservation && (
-            <div style={{
-              backgroundColor: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              marginBottom: "14px",
-              textAlign: "center"
-            }}>
-              <Text strong style={{ color: "#166534", fontSize: "13px" }}>
-                ✓ RECONOCIDO COMO CLIENTE FIJO / RESERVA: Acceso exento de pago a la salida.
-              </Text>
-            </div>
-          )}
+        {showReceiptView ? (
+          <div style={{ padding: "6px 0" }}>
+            {ticketResult?.hasReservation && (
+              <div
+                style={{
+                  backgroundColor: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  padding: "6px 10px",
+                  marginBottom: "10px",
+                  textAlign: "center",
+                }}
+              >
+                <Text strong style={{ color: "#166534", fontSize: "12px" }}>
+                  ✓ RECONOCIDO COMO CLIENTE FIJO / RESERVA: Acceso exento de pago a la salida.
+                </Text>
+              </div>
+            )}
 
-          {ticketResult && (
-            <KioskTicket
-              qrCanvasRef={qrCanvasRef}
-              ticketTimeVal={formattedTicketTime}
-              ticketCodeVal={ticketResult.ticketNumber}
-              dict={kioskDict}
-            />
-          )}  
-        </div>
+            {ticketResult && (
+              <KioskTicket
+                qrCanvasRef={qrCanvasRef}
+                ticketTimeVal={formattedTicketTime}
+                ticketCodeVal={ticketResult.ticketNumber}
+                plateNumberVal={ticketResult.plateNumber}
+                assignedSpaceVal={ticketResult.assignedSpace}
+                rateVal={ticketRate}
+                dict={kioskDict}
+              />
+            )}
+          </div>
+        ) : (
+          <Success countdown={countdown} dict={successDict} />
+        )}
       </Modal>
     </div>
   );

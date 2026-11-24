@@ -6,10 +6,29 @@ import type {
 import { http } from "@/app/lib/http";
 
 export type Reservation = {
+  id?: number;
+  status?: string | null;
+  hasTicket?: boolean;
+  has_ticket?: boolean;
+  ticketId?: number | string | null;
+  ticket_id?: number | string | null;
+  qrCode?: string | null;
   startTime: string;
   endTime: string;
   parkingSpaceId: number;
+  parkingLotId?: number;
   vehiclePlateNumber?: string | null;
+  parkingSpace?: {
+    id?: number;
+    spaceNumber?: string | number;
+    floor?: {
+      floorNumber?: string | number;
+      lot?: {
+        id?: number;
+        name?: string;
+      } | null;
+    } | null;
+  } | null;
 };
 
 export type ReservationFields = {
@@ -59,6 +78,17 @@ export async function updateReservation(
   return response.data;
 }
 
-export async function deleteReservation(id: number) {
+export async function deleteReservation(id: number | string) {
   await http.delete<unknown>(`${reservationsPath}/${id}`);
+}
+
+export async function validateReservationQr(code: string) {
+  const response = await http.post<ApiResponse<Reservation> & Reservation>(
+    `${reservationsPath}/validate-qr`,
+    { code },
+  );
+  const data = (response && typeof response === "object" && "data" in response && response.data
+    ? response.data
+    : response) as Reservation;
+  return data;
 }

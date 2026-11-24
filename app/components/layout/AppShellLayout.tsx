@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Flex, Layout, Menu, MenuProps, Typography } from "antd";
+import { Button, Flex, Layout, Menu, MenuProps } from "antd";
 import Image from "next/image";
 import { useState } from "react";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
@@ -10,7 +10,10 @@ import Link from "next/link";
 import { AppLogo } from "../AppLogo";
 
 const { Header, Sider, Content } = Layout;
-const { Title, Text } = Typography;
+
+const SIDER_WIDTH = 260;
+const SIDER_COLLAPSED_WIDTH = 80;
+const HEADER_HEIGHT = 64;
 
 export type AppShellLayoutProps = React.PropsWithChildren<{
   pathname: string;
@@ -70,16 +73,28 @@ const AppShellLayout = ({
   );
   const [openKeys, setOpenKeys] = useState<string[]>(matchedOpenKeys);
 
+  const currentSidebarWidth = collapsed ? SIDER_COLLAPSED_WIDTH : SIDER_WIDTH;
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sider
-        width={260}
+        width={SIDER_WIDTH}
+        collapsedWidth={SIDER_COLLAPSED_WIDTH}
         theme="dark"
         trigger={null}
         collapsible
         collapsed={collapsed}
         onCollapse={(value) => setCollapsed(value)}
         breakpoint="lg"
+        style={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          height: "100vh",
+          overflowY: "auto",
+          zIndex: 100,
+        }}
       >
         <Flex
           align="center"
@@ -108,14 +123,29 @@ const AppShellLayout = ({
           items={buildMenuItems(visibleItems, () => true)}
         />
       </Sider>
-      <Layout>
+
+      <Layout
+        style={{
+          marginLeft: currentSidebarWidth,
+          transition: "margin-left 0.2s",
+          minWidth: 0,
+        }}
+      >
         <Header
           style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            left: currentSidebarWidth,
+            height: HEADER_HEIGHT,
+            zIndex: 90,
             background: "#fff",
             padding: "0 24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            borderBottom: "1px solid #f0f0f0",
+            transition: "left 0.2s",
           }}
         >
           <Button
@@ -124,8 +154,6 @@ const AppShellLayout = ({
             onClick={() => setCollapsed(!collapsed)}
             style={{
               fontSize: "16px",
-              //   width: 64,
-              //   height: 64
             }}
           />
           <HeaderUserSection
@@ -134,7 +162,16 @@ const AppShellLayout = ({
             onLogout={() => handleSignOut?.()}
           />
         </Header>
-        <Content style={{ margin: "24px 16px 0", overflow: "initial" }}>
+
+        <Content
+          style={{
+            paddingTop: HEADER_HEIGHT + 24,
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingBottom: 24,
+            overflow: "initial",
+          }}
+        >
           {children}
         </Content>
       </Layout>

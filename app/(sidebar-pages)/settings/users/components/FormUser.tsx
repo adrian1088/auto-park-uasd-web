@@ -19,10 +19,11 @@ const baseFields: FieldConfig[] = [
     label: "Rol",
     type: "select",
     required: true,
-    options: [
-      { label: "Administrador", value: "admin" },
-      { label: "Usuario", value: "user" },
-    ],
+  options: [
+    { label: "Administrador", value: "admin" },
+    { label: "Operador", value: "operator" },
+    { label: "Cliente", value: "user" },
+  ],
   },
   { name: "active", label: "Activo", type: "switch" },
 ];
