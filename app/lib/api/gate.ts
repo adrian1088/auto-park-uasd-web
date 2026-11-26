@@ -1,4 +1,3 @@
-// app/lib/api/gate.ts
 import { http } from '@/app/lib/http';
 
 export type GateEntryResult = {

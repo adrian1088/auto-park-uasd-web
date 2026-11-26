@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, Button, Table, Tag, Typography, Card} from "antd";
+import { getErrorMessage } from "@/app/lib/utils";
 import type { TableProps } from "antd";
 import { useEffect, useState } from "react";
 import { getTicketsPaginated } from "@/app/lib/api/tickets";
@@ -20,12 +21,6 @@ export const ticketStatusLabels: Record<
   CANCELLED: { label: "Cancelado", color: "#dc2626", bg: "#fee2e2" },
   COMPLETED: { label: "Completado", color: "#64748b", bg: "#f1f5f9" },
 };
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
-}
 
 export type DataTableTicketProps = {
   /** Filtros que se envían al servidor. */
@@ -65,7 +60,8 @@ const DataTableTicket = ({ filters, onView }: DataTableTicketProps) => {
         setTickets(response.data);
         setTotal(response.meta.total);
       } catch (error) {
-        if (active) setLoadError(getErrorMessage(error));
+        const errorMessage = getErrorMessage(error);
+        if (active) setLoadError(errorMessage);
       } finally {
         if (active) setLoading(false);
       }

@@ -11,6 +11,7 @@ import type { Ticket, TicketFilters } from "@/app/lib/api/tickets";
 import { formatDateTime, formatMoney } from "@/app/lib/utils/format";
 import DataTableTicket, { ticketStatusLabels } from "./components/DataTableTicket";
 import FilterTicket from "./components/FilterTicket";
+import { getErrorMessage } from "@/app/lib/utils";
 const { Text } = Typography;
 
 type TicketDetailData = Ticket & {
@@ -57,12 +58,6 @@ function resolveSpace(ticket: TicketDetailData): string {
   }
 
   return "N/A";
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
 }
 
 const TicketsPage = () => {
@@ -113,8 +108,9 @@ const TicketsPage = () => {
       setSelectedTicket((await getTicket(id)) as TicketDetailData);
     } catch (error) {
       setDetailOpen(false);
+      const errorMessage = getErrorMessage(error)
       messageApi.error(
-        `No se pudo cargar el ticket: ${getErrorMessage(error)}`,
+        `No se pudo cargar el ticket: ${errorMessage}`,
       );
     } finally {
       setLoadingDetail(false);

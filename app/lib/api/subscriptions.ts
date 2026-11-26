@@ -1,5 +1,6 @@
 import { http } from '@/app/lib/http';
 
+export const path = 'subscriptions';
 export interface Subscription {
   id: number;
   userId: number;
@@ -26,7 +27,7 @@ export interface CreateSubscriptionDto {
 
 export const SubscriptionsService = {
   async findAll(): Promise<Subscription[]> {
-    const response = await http.get<unknown>('subscriptions');
+    const response = await http.get<unknown>(path);
     
     if (Array.isArray(response)) {
       return response as Subscription[];
@@ -40,18 +41,18 @@ export const SubscriptionsService = {
   },
 
   async create(data: CreateSubscriptionDto): Promise<Subscription> {
-    return await http.post<Subscription>('subscriptions', data);
+    return await http.post<Subscription>(path, data);
   },
 
   async update(id: number, data: Partial<CreateSubscriptionDto>): Promise<Subscription> {
-    return await http.patch<Subscription>(`subscriptions/${id}`, data);
+    return await http.patch<Subscription>(`${path}/${id}`, data);
   },
 
   async renew(id: number, amount: number, paymentMethod: string): Promise<Subscription> {
-    return await http.post<Subscription>(`subscriptions/${id}/renew`, { amount, paymentMethod });
+    return await http.post<Subscription>(`${path}/${id}/renew`, { amount, paymentMethod });
   },
 
   async remove(id: number): Promise<void> {
-    return await http.delete<void>(`subscriptions/${id}`);
+    return await http.delete<void>(`${path}/${id}`);
   },
 };
