@@ -2,11 +2,12 @@
 
 import { Flex, Form, Typography, Button, message } from "antd";
 import { RollbackOutlined } from "@ant-design/icons";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 import FormSignUp from "./components/FormSignUp";
 import { useState } from "react";
 import { register, SignUpFields } from "@/app/lib/api/auth";
 import { getErrorMessage } from "@/app/lib/utils";
+import { AppLogo } from "@/app/components/AppLogo";
 
 const { Title, Text } = Typography;
 
@@ -32,6 +33,7 @@ function getSignUpFields(values: Record<string, unknown>): SignUpFields {
   };
 }
 const SignUpPage = () => {
+  const router = useRouter();
   const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
@@ -43,6 +45,10 @@ const SignUpPage = () => {
       await register(fields);
       messageApi.success(
         "Cuenta registrada exitosamente, por favor revise su correo para activar la cuenta.",
+        10,
+        () => {
+          router.push("/sign-in");
+        },
       );
       form.resetFields();
     } catch (error: any) {
@@ -66,18 +72,7 @@ const SignUpPage = () => {
       }}
       vertical
     >
-      <Image
-        src="/images/logo.png"
-        alt="Auto Park UASD"
-        width={855}
-        height={247}
-        style={{
-          width: "100%",
-          maxWidth: 300,
-          height: "auto",
-          marginBottom: 44,
-        }}
-      />
+      <AppLogo />
       <Title level={4}>Registrar Cuenta</Title>
       <Text style={{ textAlign: "center" }} type="secondary">
         Por favor complete el formulario para crear una cuenta.
@@ -98,7 +93,7 @@ const SignUpPage = () => {
         <Button
           size="large"
           type="primary"
-          disabled={form.isFieldsTouched() && !form.isFieldsValidating() ? false : isSubmitting}
+          disabled={isSubmitting}
           block
           onClick={() => form.submit()}
           loading={isSubmitting}

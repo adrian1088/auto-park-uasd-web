@@ -3,7 +3,13 @@
 import { Button, Card, Flex, Form, message, Modal } from "antd";
 import { useState } from "react";
 import HeaderPage from "@/app/components/HeaderPage";
-import { createUser, getUser, updateUser, UserRole, UserStatus } from "@/app/lib/api/users";
+import {
+  createUser,
+  getUser,
+  updateUser,
+  UserRole,
+  UserStatus,
+} from "@/app/lib/api/users";
 import type { User, UserFields } from "@/app/lib/api/users";
 import { requiredText } from "@/app/lib/utils";
 import DataTableUser from "./components/DataTableUser";
@@ -28,14 +34,14 @@ function getUserFields(
     name: requiredText(values, "name", "El nombre"),
     email: requiredText(values, "email", "El correo"),
     phone: requiredText(values, "phone", "El teléfono"),
-    role: requiredText(values, "role", "El rol")     as UserRole,
-        status:
-          mode === "edit"
-            ? values.active
-              ? UserStatus.ACTIVE
-              : UserStatus.INACTIVE
-            : undefined,
-      };
+    role: requiredText(values, "role", "El rol") as UserRole,
+    status:
+      mode === "edit"
+        ? values.active
+          ? UserStatus.ACTIVE
+          : UserStatus.INACTIVE
+        : undefined,
+  };
 }
 
 const UsersPage = () => {

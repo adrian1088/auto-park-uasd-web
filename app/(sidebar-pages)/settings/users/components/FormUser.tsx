@@ -1,6 +1,6 @@
 "use client";
 
-import { Form, type FormInstance } from "antd";
+import { type FormInstance } from "antd";
 import { DynamicForm, type FieldConfig } from "@/app/components/form";
 
 const baseFields: FieldConfig[] = [
@@ -19,10 +19,11 @@ const baseFields: FieldConfig[] = [
     label: "Rol",
     type: "select",
     required: true,
-    options: [
-      { label: "Administrador", value: "admin" },
-      { label: "Usuario", value: "user" },
-    ],
+  options: [
+    { label: "Administrador", value: "admin" },
+    { label: "Operador", value: "operator" },
+    { label: "Cliente", value: "user" },
+  ],
   },
   { name: "active", label: "Activo", type: "switch" },
 ];
@@ -51,5 +52,4 @@ const FormUser = ({ form, initialValues, onSubmit, mode }: Props) => {
   );
 };
 
-export { Form };
 export default FormUser;

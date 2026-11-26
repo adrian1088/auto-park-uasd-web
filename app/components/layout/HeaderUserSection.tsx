@@ -1,11 +1,6 @@
-'use client';
+"use client";
 
-import {
-  BellOutlined,
-  LogoutOutlined,
-  SettingOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
+import { BellOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import {
   Badge,
   Button,
@@ -14,10 +9,13 @@ import {
   Flex,
   MenuProps,
   Space,
-} from 'antd';
-import Link from 'antd/lib/typography/Link';
-import Avatar from '../Avatar';
+  Typography,
+} from "antd";
+import Link from "antd/lib/typography/Link";
+import Avatar from "../Avatar";
+import { useEffect, useState } from "react";
 
+const { Text } = Typography;
 export type CurrentUser = {
   id: number;
   email: string;
@@ -37,36 +35,75 @@ export function HeaderUserSection({
   isLoggingOut,
   onLogout,
 }: HeaderUserSectionProps) {
-  const items: MenuProps['items'] = [
+const [currentDateTime, setCurrentDateTime] = useState("");
+
+useEffect(() => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const updateDateTime = () => {
+    setCurrentDateTime(formatCurrentDateTime());
+    const millisecondsUntilNextMinute = 60_000 - (Date.now() % 60_000);
+    timeoutId = setTimeout(updateDateTime, millisecondsUntilNextMinute + 50);
+  };
+
+  updateDateTime();
+  return () => clearTimeout(timeoutId);
+}, []);
+
+  const items: MenuProps["items"] = [
     {
       label: <Link href="/profile">Mi Perfil</Link>,
-      key: 'profile',
+      key: "profile",
       icon: <UserOutlined />,
     },
     {
-      label: 'Cerrar sesión',
-      key: 'logout',
+      label: "Cerrar sesión",
+      key: "logout",
       icon: <LogoutOutlined />,
       danger: true,
       disabled: isLoggingOut,
     },
   ];
 
-  const handleMenuClick: MenuProps['onClick'] = (e) => {
-    if (e.key === 'logout' && !isLoggingOut) {
+  const handleMenuClick: MenuProps["onClick"] = (e) => {
+    if (e.key === "logout" && !isLoggingOut) {
       void onLogout();
     }
   };
 
+const formatCurrentDateTime = () => {
+  const now = new Date();
+
+  const date = now.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `${date} ${time}`;
+};
   return (
     <Space size="middle">
-      <Button type="dashed" shape="circle" icon={<SettingOutlined />} />
-      <Badge count="4">
+      <Text
+        styles={{
+          root: {
+            color: "#1677ff",
+          },
+        }}
+      >
+        {currentDateTime}
+      </Text>
+      <Badge count="0">
         <Button type="dashed" shape="circle" icon={<BellOutlined />} />
       </Badge>
       <Divider vertical />
       <Dropdown
-        trigger={['click']}
+        trigger={["click"]}
         placement="bottomRight"
         menu={{
           items: items,
@@ -75,9 +112,9 @@ export function HeaderUserSection({
       >
         <Flex
           align="center"
-          style={{ cursor: 'pointer', opacity: isLoggingOut ? 0.7 : 1 }}
+          style={{ cursor: "pointer", opacity: isLoggingOut ? 0.7 : 1 }}
         >
-          <Avatar fullName={user?.name} />
+          <Avatar fullName={user?.name} maxInitials={2} />
         </Flex>
       </Dropdown>
     </Space>

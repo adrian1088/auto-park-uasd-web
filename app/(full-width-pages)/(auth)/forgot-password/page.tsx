@@ -7,6 +7,7 @@ import FormForgotPassword from "./components/FormForgotPassword";
 import { useState } from "react";
 import { forgotPassword } from "@/app/lib/api/auth";
 import { getErrorMessage } from "@/app/lib/utils";
+import { AppLogo } from "@/app/components/AppLogo";
 
 const { Title, Text } = Typography;
 
@@ -54,18 +55,7 @@ const ForgotPasswordPage = () => {
       }}
       vertical
     >
-      <Image
-        src="/images/logo.png"
-        alt="Auto Park UASD"
-        width={855}
-        height={247}
-        style={{
-          width: "100%",
-          maxWidth: 300,
-          height: "auto",
-          marginBottom: 44,
-        }}
-      />
+      <AppLogo />
       <Title level={4}>Recuperar Contraseña</Title>
       <Text style={{ textAlign: "center" }} type="secondary">
         Por favor complete el formulario para recuperar su contraseña.

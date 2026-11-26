@@ -66,10 +66,10 @@ export const forgotPassword = async (email: string) => {
   return data;
 };
 
-export const resetPassword = async (token: string, password: string) => {
+export const resetPassword = async (token: string, newPassword: string) => {
   const data = await http.post(
     httpConfig.resetPasswordPath,
-    { token, password },
+    { token, newPassword },
     { skipAuth: true },
   );
   return data;

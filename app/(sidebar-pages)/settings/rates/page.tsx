@@ -14,13 +14,9 @@ import DataTableRate from "./components/DataTableRate";
 import FormRate, { rateTypeOptions } from "./components/FormRate";
 import { getParkingLots } from "@/app/lib/api/lots";
 import type { ParkingLot } from "@/app/lib/api/lots";
+import { getErrorMessage } from "@/app/lib/utils";
 
-function getErrorMessage(error: unknown) {
-  console.log("🚀 ~ getErrorMessage ~ error:", error)
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
-}
+
 
 function getRateFields(values: Record<string, unknown>): RateFields {
   const { parkingLotId: rawParkingLotId, type, amount, validFrom, validTo } = values;
@@ -94,10 +90,8 @@ const RatesPage = () => {
   const openEditModal = async (id: number) => {
     try {
       const rate = await getRate(id);
-      console.log("🚀 ~ openEditModal ~ rate:", rate)
       form.resetFields();
       const hey = toFormValues(rate);
-      console.log("🚀 ~ openEditModal ~ hey:", hey)
       form.setFieldsValue(hey);
       setMode("edit");
       setSelectedRate(rate);
@@ -179,6 +173,7 @@ const RatesPage = () => {
         }
       >
         <DataTableRate
+          key={`${filterLotId ?? ""}-${filterType ?? ""}`}
           parkingLotId={filterLotId}
           type={filterType}
           reloadKey={reloadKey}

@@ -17,7 +17,7 @@ const typeOptions = [
 const statusOptions = [
   { label: "Libre", value: "FREE" },
   { label: "Ocupado", value: "OCCUPIED", disabled: true },
-  { label: "Reservado", value: "RESERVED", disabled: true },
+  { label: "Reservado", value: "RESERVED" },
   { label: "Fuera de servicio", value: "OUT_OF_SERVICE" },
 ];
 
@@ -70,16 +70,15 @@ const FormParkingSpace = ({
     },
   ];
 
-  if (isEditing) {
+if (isEditing) {
     fields.push({
       name: "status",
       label: "Estado",
       type: "select",
       options: statusOptions,
-      disabled: (values) =>
-        values.status === "OCCUPIED" || values.status === "RESERVED",
+      disabled: (values) => values.status === "OCCUPIED",
       helpText:
-        "Los estados Ocupado y Reservado se actualizan desde los flujos operativos.",
+        "El estado Ocupado se actualiza automáticamente mediante los flujos operativos.",
     });
   }
 

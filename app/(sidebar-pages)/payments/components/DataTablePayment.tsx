@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Popconfirm, Space, Table, message } from "antd";
+import { Alert, Button, Popconfirm, Space, Table, Tag, message } from "antd";
 import type { TableProps } from "antd";
 import { useEffect, useState } from "react";
 import { deletePayment, getPaymentsPaginated } from "@/app/lib/api/payments";
@@ -8,6 +8,7 @@ import type {
   Payment,
   PaymentFilters,
   PaymentMethod,
+  PaymentOriginType,
 } from "@/app/lib/api/payments";
 import { DEFAULT_PAGE_SIZE } from "@/app/lib/constants";
 import { formatDateTime, formatMoney } from "@/app/lib/utils/format";
@@ -20,15 +21,57 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
 };
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Ocurrió un error inesperado.";
+  return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
+}
+
+function resolvePaymentOrigin(payment: Payment): {
+  kind: PaymentOriginType;
+  text: string;
+} {
+  if (payment.originType) {
+    if (payment.originType === "SUBSCRIPTION") {
+      return {
+        kind: "SUBSCRIPTION",
+        text: payment.originLabel || "Renovación de Suscripción",
+      };
+    }
+    if (payment.originType === "RESERVATION") {
+      return {
+        kind: "RESERVATION",
+        text: payment.ticket?.code
+          ? `Reservación · #${payment.ticket.code}`
+          : payment.originLabel || "Reservación",
+      };
+    }
+    return {
+      kind: "COMMON_TICKET",
+      text: payment.ticket?.code
+        ? `Cliente Común`
+        : payment.originLabel || "Cliente Común",
+    };
+  }
+
+  if (!payment.ticket) {
+    return { kind: "SUBSCRIPTION", text: "Renovación de Suscripción" };
+  }
+  if (payment.ticket.reservationId != null) {
+    return {
+      kind: "RESERVATION",
+      text: payment.ticket.code
+        ? `Reservación · #${payment.ticket.code}`
+        : "Reservación",
+    };
+  }
+  return {
+    kind: "COMMON_TICKET",
+    text: payment.ticket.code
+      ? `Cliente Común`
+      : "Cliente Común",
+  };
 }
 
 export type DataTablePaymentProps = {
-  /** Filtros que se envían al servidor. */
   filters: PaymentFilters;
-  /** Cambiar este valor fuerza una recarga del listado. */
   reloadKey?: number;
   onEdit: (id: number) => Promise<void>;
 };
@@ -49,7 +92,6 @@ const DataTablePayment = ({
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
 
-  // Al cambiar los filtros se vuelve a la primera página.
   const [prevFilters, setPrevFilters] = useState(filters);
   if (prevFilters !== filters) {
     setPrevFilters(filters);
@@ -112,44 +154,73 @@ const DataTablePayment = ({
 
   const columns: TableProps<Payment>["columns"] = [
     {
-      title: "Ticket",
-      key: "ticket",
-      render: (_value, payment) => payment.ticket.code,
+      title: <span style={{ fontSize: "12.5px" }}>Origen / Referencia</span>,
+      key: "origin",
+      render: (_value, payment) => {
+        const { kind, text } = resolvePaymentOrigin(payment);
+        const color =
+          kind === "COMMON_TICKET"
+            ? "blue"
+            : kind === "RESERVATION"
+              ? "cyan"
+              : "purple";
+
+        return (
+          <Tag
+            color={color}
+            style={{ fontSize: "12px", padding: "1px 8px", borderRadius: "6px" }}
+          >
+            {text}
+          </Tag>
+        );
+      },
     },
     {
-      title: "Monto",
+      title: <span style={{ fontSize: "12.5px" }}>Monto</span>,
       dataIndex: "amount",
       key: "amount",
-      render: formatMoney,
+      render: (val) => (
+        <span style={{ fontWeight: 600, color: "#3f8600", fontSize: "12.5px" }}>
+          {formatMoney(val)}
+        </span>
+      ),
     },
     {
-      title: "Método",
+      title: <span style={{ fontSize: "12.5px" }}>Método de Pago</span>,
       dataIndex: "method",
       key: "method",
-      render: (method: PaymentMethod) => paymentMethodLabels[method],
+      render: (method: PaymentMethod) => (
+        <span style={{ fontSize: "12.5px" }}>
+          {paymentMethodLabels[method] || method}
+        </span>
+      ),
     },
     {
-      title: "Fecha",
+      title: <span style={{ fontSize: "12.5px" }}>Fecha de Registro</span>,
       dataIndex: "date",
       key: "date",
-      render: formatDateTime,
+      render: (val) => (
+        <span style={{ fontSize: "12.5px" }}>{formatDateTime(val)}</span>
+      ),
     },
     {
-      title: "Acciones",
+      title: <span style={{ fontSize: "12.5px" }}>Acciones</span>,
       key: "actions",
       render: (_value, payment) => (
-        <Space>
+        <Space size={8}>
           <Button
             type="link"
+            size="small"
+            style={{ fontSize: "12.5px", paddingInline: 4 }}
             loading={editingId === payment.id}
             disabled={editingId !== null}
             onClick={() => void handleEdit(payment.id)}
           >
-            Editar
+            Auditar
           </Button>
           <Popconfirm
-            title="Eliminar pago"
-            description="¿Seguro que deseas eliminar este pago?"
+            title="Eliminar registro financiero"
+            description="¿Seguro que deseas eliminar esta transacción?"
             okText="Eliminar"
             cancelText="Cancelar"
             okButtonProps={{ danger: true, loading: deletingId === payment.id }}
@@ -157,7 +228,9 @@ const DataTablePayment = ({
           >
             <Button
               type="link"
+              size="small"
               danger
+              style={{ fontSize: "12.5px", paddingInline: 4 }}
               loading={deletingId === payment.id}
               disabled={deletingId !== null}
             >
@@ -170,19 +243,17 @@ const DataTablePayment = ({
   ];
 
   return (
-    <>
+    <div style={{ fontSize: "12.5px" }}>
       {contextHolder}
       {loadError && (
         <Alert
           type="error"
           showIcon
+          style={{ fontSize: "12.5px", margin: "8px 16px" }}
           title="No se pudieron cargar los pagos."
           description={loadError}
           action={
-            <Button
-              size="small"
-              onClick={() => setLocalReload((key) => key + 1)}
-            >
+            <Button size="small" onClick={() => setLocalReload((key) => key + 1)}>
               Reintentar
             </Button>
           }
@@ -197,15 +268,16 @@ const DataTablePayment = ({
           current: page,
           pageSize,
           total,
+          size: "small",
           showSizeChanger: true,
-          style: { paddingRight: "24px" },
+          style: { paddingRight: "20px", fontSize: "12px" },
         }}
         onChange={(pagination) => {
           setPage(pagination.current ?? 1);
           setPageSize(pagination.pageSize ?? DEFAULT_PAGE_SIZE);
         }}
       />
-    </>
+    </div>
   );
 };
 

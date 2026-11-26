@@ -11,16 +11,6 @@ export type Rate = {
   validTo?: string | null;
 };
 
-// El API devuelve el estacionamiento anidado y los bigint/decimal como string.
-function normalizeRate(rate: Rate): Rate {
-  return {
-    ...rate,
-    id: Number(rate.id),
-    parkingLot: rate.parkingLot,
-    amount: Number(rate.amount),
-  };
-}
-
 export type RateFields = {
   parkingLotId: number;
   type: RateType;

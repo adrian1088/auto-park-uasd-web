@@ -8,12 +8,23 @@ import type { Ticket } from "@/app/lib/api/tickets";
 
 export type PaymentMethod = "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "PAYPAL";
 
+export type PaymentOriginType =
+  | "SUBSCRIPTION"
+  | "RESERVATION"
+  | "COMMON_TICKET";
+
+export type PaymentTicketInfo = Ticket & {
+  reservationId?: number | null;
+};
+
 export type Payment = {
   id: number;
   amount: number;
   date: string;
   method: PaymentMethod;
-  ticket: Ticket;
+  originType?: PaymentOriginType;
+  originLabel?: string;
+  ticket: PaymentTicketInfo | null;
 };
 
 export type PaymentFields = {
